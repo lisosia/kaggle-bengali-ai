@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 import torch
 from torch.utils.data.dataset import Dataset
 
+import config
+C = config.load_config()
+
 #####################################################################
 # Data load
 #####################################################################
@@ -34,11 +37,11 @@ def prepare_image(datadir, featherdir, data_type='train',
 
 # load data
 _time_start = time.time()
-train = pd.read_csv(datadir/'train.csv')
+train = pd.read_csv(C.datadir/'train.csv')
 train_labels = train[['grapheme_root', 'vowel_diacritic', 'consonant_diacritic']].values
-indices = [0] if debug else [0, 1, 2, 3]
+indices = [0] if C.debug else [0, 1, 2, 3]
 train_images = prepare_image(
-    datadir, featherdir, data_type='train', submission=False, indices=indices)
+    C.datadir, C.featherdir, data_type='train', submission=False, indices=indices)
 print(f'data load time was {time.time() - _time_start}')
 
 
@@ -360,16 +363,16 @@ def get_train_dataset_justfortest():
 
 def get_trainval_dataset():
     n_dataset = len(train_images)
-    train_data_size = 200 if debug else int(n_dataset * 0.9)
-    valid_data_size = 100 if debug else int(n_dataset - train_data_size)
+    train_data_size = 200 if C.debug else int(n_dataset * 0.9)
+    valid_data_size = 100 if C.debug else int(n_dataset - train_data_size)
 
     perm = np.random.RandomState(777).permutation(n_dataset)
     print('perm', perm)
     train_dataset = BengaliAIDataset(
-        train_images, train_labels, transform=Transform(size=(image_size, image_size)),
+        train_images, train_labels, transform=Transform(size=(C.image_size, C.image_size)),
         indices=perm[:train_data_size])
     valid_dataset = BengaliAIDataset(
-        train_images, train_labels, transform=Transform(affine=False, crop=True, size=(image_size, image_size)),
+        train_images, train_labels, transform=Transform(affine=False, crop=True, size=(C.image_size, C.image_size)),
         indices=perm[train_data_size:train_data_size+valid_data_size])
     print('train_dataset', len(train_dataset), 'valid_dataset', len(valid_dataset))
 
@@ -379,7 +382,7 @@ def get_trainval_dataset():
 ########## COPYED FROM PREDICTION KERNEL #############
 # note. treth is 20, image_size is 128 for all 4 provided models
 ## transform_test = Transform(affine=False, crop=True, size=(image_size, image_size), threshold, train=False)
-transform_test = Transform(affine=False, crop=True, size=(image_size, image_size), threshold=20, train=False)
+transform_test = Transform(affine=False, crop=True, size=(C.image_size, C.image_size), threshold=20, train=False)
 ########## COPYED FROM PREDICTION KERNEL #############
 
 #def get_test_dataset(idx):

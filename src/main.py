@@ -34,25 +34,12 @@ from sklearn.model_selection import KFold
 # --- import local modules ---
 from dataset import *
 from model import *
+import config
 
 # --- setup ---
 pd.set_option('max_columns', 50)
 
-
-debug=True
-submission=False
-batch_size=32
-device='cuda:0' if torch.cuda.is_available() else 'cpu'
-out='.'
-image_size=64
-arch='pretrained'
-model_name='se_resnext50_32x4d'
-
-
-datadir = Path('../input/bengaliai-cv19')
-featherdir = Path('../input/bengaliaicv19feather')
-outdir = Path('.')
-
+C = config.load_config()
 
 ##############################################################
 # Training
@@ -60,14 +47,14 @@ outdir = Path('.')
 train_dataset, valid_dataset = get_trainval_dataset()
 
 # --- Model ---
-device = torch.device(device)
+device = torch.device(C.device)
 n_grapheme = 168
 n_vowel = 11
 n_consonant = 7
 n_total = n_grapheme + n_vowel + n_consonant
 print('n_total', n_total)
 # Set pretrained='imagenet' to download imagenet pretrained model...
-predictor = PretrainedCNN(in_channels=1, out_dim=n_total, model_name=model_name, pretrained=None)
+predictor = PretrainedCNN(in_channels=1, out_dim=n_total, model_name=C.model_name, pretrained=None)
 print('predictor', type(predictor))
 
 classifier = BengaliClassifier(predictor).to(device)
@@ -329,8 +316,8 @@ from numpy.random.mtrand import RandomState
 from torch.utils.data.dataloader import DataLoader
 
 
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
+train_loader = DataLoader(train_dataset, batch_size=C.batch_size, shuffle=True)
+valid_loader = DataLoader(valid_dataset, batch_size=C.batch_size, shuffle=False)
 
 optimizer = torch.optim.Adam(classifier.parameters(), lr=0.001)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -369,18 +356,18 @@ def schedule_lr(engine):
 
 trainer.add_event_handler(Events.EPOCH_COMPLETED, run_evaluator)
 trainer.add_event_handler(Events.EPOCH_COMPLETED, schedule_lr)
-log_report = LogReport(evaluator, outdir)
+log_report = LogReport(evaluator, C.outdir)
 trainer.add_event_handler(Events.EPOCH_COMPLETED, log_report)
 trainer.add_event_handler(
     Events.EPOCH_COMPLETED,
-    ModelSnapshotHandler(predictor, filepath=outdir / 'predictor.pt'))
+    ModelSnapshotHandler(predictor, filepath=C.outdir / 'predictor.pt'))
 
 #################################################################
 # Train
 #################################################################
-trainer.run(train_loader, max_epochs=10)
+trainer.run(train_loader, max_epochs=C.n_epoch)
 
 train_history = log_report.get_dataframe()
-train_history.to_csv(outdir / 'log.csv', index=False)
+train_history.to_csv(C.outdir / 'log.csv', index=False)
 
 train_history
