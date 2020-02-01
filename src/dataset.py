@@ -9,7 +9,8 @@ import torch
 from torch.utils.data.dataset import Dataset
 
 import config
-C = config.load_config()
+
+C = config.get_config()
 
 #####################################################################
 # Data load
@@ -34,16 +35,6 @@ def prepare_image(datadir, featherdir, data_type='train',
     gc.collect()
     images = np.concatenate(images, axis=0)
     return images
-
-# load data
-_time_start = time.time()
-train = pd.read_csv(C.datadir/'train.csv')
-train_labels = train[['grapheme_root', 'vowel_diacritic', 'consonant_diacritic']].values
-indices = [0] if C.debug else [0, 1, 2, 3]
-train_images = prepare_image(
-    C.datadir, C.featherdir, data_type='train', submission=False, indices=indices)
-print(f'data load time was {time.time() - _time_start}')
-
 
 #####################################################################
 # Dataset
@@ -360,6 +351,15 @@ def get_train_dataset_justfortest():
         piece_affine_ratio=0.2, ssr_ratio=0.2)
     return BengaliAIDataset(train_images, train_labels,
                                  transform=train_transform)
+
+# load data
+_time_start = time.time()
+train = pd.read_csv(C.datadir/'train.csv')
+train_labels = train[['grapheme_root', 'vowel_diacritic', 'consonant_diacritic']].values
+indices = [0] if C.debug else [0, 1, 2, 3]
+train_images = prepare_image(
+    C.datadir, C.featherdir, data_type='train', submission=False, indices=indices)
+print(f'data load time was {time.time() - _time_start}')
 
 def get_trainval_dataset():
     n_dataset = len(train_images)

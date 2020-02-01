@@ -1,29 +1,65 @@
+import os
+import yaml
 from pathlib import Path
 import torch
 
-class _Conf():
-    debug=True
-    submission=False
-    batch_size=32
-    device='cuda:0' if torch.cuda.is_available() else 'cpu'
-    out='.'
-    image_size=64
-    arch='pretrained'
-    model_name='se_resnext50_32x4d'
-
-    datadir = Path('../input/bengaliai-cv19')
-    featherdir = Path('../input/bengaliaicv19feather')
-    outdir = Path('.')
-
-    n_epoch = 10
-
-    def __init__(self):
-        raise
+from easydict import EasyDict
 
 
 def _get_default_config():
-    return _Conf
+    c = EasyDict()
+
+    c.submission=False
+    c.batch_size=32
+    c.device='cuda:0' if torch.cuda.is_available() else 'cpu'
+    c.out='.'
+    c.image_size=64
+    c.arch='pretrained'
+    c.model_name='se_resnext50_32x4d'
+
+    c.datadir = Path('../input/bengaliai-cv19')
+    c.featherdir = Path('../input/bengaliaicv19feather')
+    c.outdir = Path('.')
+
+    c.n_epoch = 1
+
+    return c
 
 
-def load_config(yaml_path=None):
-    return _get_default_config()
+# borrowed from:
+# https://github.com/bamps53/kaggle-autonomous-driving2019/blob/master/config/base.py
+def _merge_config(src, dst):
+    if not isinstance(src, EasyDict):
+        raise
+
+    for k, v in src.items():
+        if isinstance(v, EasyDict):
+            _merge_config(src[k], dst[k])
+        else:
+            dst[k] = v
+
+
+global_config = None  # set_yaml in main()
+
+def get_config(config_path=None):
+    global global_config
+    if global_config is not None:
+        return global_config
+    elif config_path is None:
+        raise Exception("gibe config_path arg when first call ")
+
+    config = _get_default_config()
+
+    with open(config_path, 'r') as fid:
+        yaml_config = EasyDict(yaml.load(fid, Loader=yaml.SafeLoader))
+
+    _merge_config(yaml_config, config)
+
+    config.outdir = f'../run/{os.path.basename(config_path)}'
+    os.makedirs(config.outdir)
+
+    global_config = config
+
+    print("config: ", config)
+    return config
+

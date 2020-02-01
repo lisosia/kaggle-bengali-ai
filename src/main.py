@@ -32,14 +32,14 @@ from sklearn.model_selection import KFold
 #import catboost as cb
 
 # --- import local modules ---
+import config
+C = config.get_config("./config/000_seresnext_baseline.yml")
 from dataset import *
 from model import *
-import config
 
 # --- setup ---
 pd.set_option('max_columns', 50)
 
-C = config.load_config()
 
 ##############################################################
 # Training
@@ -360,7 +360,7 @@ log_report = LogReport(evaluator, C.outdir)
 trainer.add_event_handler(Events.EPOCH_COMPLETED, log_report)
 trainer.add_event_handler(
     Events.EPOCH_COMPLETED,
-    ModelSnapshotHandler(predictor, filepath=C.outdir / 'predictor.pt'))
+    ModelSnapshotHandler(predictor, filepath=C.outdir + '/predictor.pt'))
 
 #################################################################
 # Train
@@ -368,6 +368,6 @@ trainer.add_event_handler(
 trainer.run(train_loader, max_epochs=C.n_epoch)
 
 train_history = log_report.get_dataframe()
-train_history.to_csv(C.outdir / 'log.csv', index=False)
+train_history.to_csv(C.outdir + '/log.csv', index=False)
 
 train_history
