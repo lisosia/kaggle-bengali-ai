@@ -316,8 +316,8 @@ from numpy.random.mtrand import RandomState
 from torch.utils.data.dataloader import DataLoader
 
 
-train_loader = DataLoader(train_dataset, batch_size=C.batch_size, shuffle=True)
-valid_loader = DataLoader(valid_dataset, batch_size=C.batch_size, shuffle=False)
+train_loader = DataLoader(train_dataset, batch_size=C.batch_size, shuffle=True, num_workers=8)
+valid_loader = DataLoader(valid_dataset, batch_size=C.batch_size, shuffle=False, num_workers=8)
 
 optimizer = torch.optim.Adam(classifier.parameters(), lr=0.001)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(

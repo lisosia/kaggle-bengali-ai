@@ -19,6 +19,7 @@ def _get_default_config():
 
     c.datadir = Path('../input/bengaliai-cv19')
     c.featherdir = Path('../input/bengaliaicv19feather')
+    c.pngdir = Path('../input/bengaliai-cv19-png')
     c.outdir = Path('.')
 
     c.n_epoch = 1

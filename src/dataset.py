@@ -20,6 +20,7 @@ C = config.get_config()
 def prepare_image(datadir, featherdir, data_type='train',
                   submission=False, indices=[0, 1, 2, 3]):
     assert data_type in ['train', 'test']
+    print("prepare_image() start")
     if submission:  # read from parquet when submission
         image_df_list = [pd.read_parquet(datadir / f'{data_type}_image_data_{i}.parquet')
                          for i in indices]
@@ -34,6 +35,7 @@ def prepare_image(datadir, featherdir, data_type='train',
     del image_df_list
     gc.collect()
     images = np.concatenate(images, axis=0)
+    print("prepare_image() end")
     return images
 
 #####################################################################
@@ -115,6 +117,29 @@ class BengaliAIDataset(DatasetMixin):
         else:
             return x
 
+class BengaliAIDatasetPNG(DatasetMixin):
+    def __init__(self, image_ids, labels=None, transform=None):
+        super(BengaliAIDatasetPNG, self).__init__(transform=transform)
+        self.image_ids = image_ids
+        self.labels = labels
+        self.train = labels is not None
+
+    def __len__(self):
+        """return length of this dataset"""
+        return len(self.image_ids)
+
+    def get_example(self, i):
+        """Return i-th data"""
+        x = cv2.imread(str(C.pngdir) + f'/Train_{i}.png', cv2.IMREAD_GRAYSCALE)
+        # Opposite white and black: background will be white and
+        # for future Affine transformation
+        x = (255 - x).astype(np.float32) / 255.
+        if self.train:
+            y = self.labels[i]
+            return x, y
+        else:
+            return x
+
 
 #####################################################################
 # Data Aug
@@ -182,43 +207,6 @@ def crop_char_image(image, threshold=5./255.):
 
 def resize(image, size=(128, 128)):
     return cv2.resize(image, size)
-
-if False:  # affine_image test
-    nrow, ncol = 1, 6
-
-    fig, axes = plt.subplots(nrow, ncol, figsize=(20, 8))
-    axes = axes.flatten()
-    for i, ax in tqdm(enumerate(axes)):
-        image, label = train_dataset[0]
-        ax.imshow(affine_image(image), cmap='Greys')
-        ax.set_title(f'label: {label}')
-    plt.tight_layout()
-
-# crop test
-if False:
-    nrow, ncol = 5, 6
-
-    fig, axes = plt.subplots(nrow, ncol, figsize=(20, 8))
-    axes = axes.flatten()
-    for i, ax in tqdm(enumerate(axes)):
-        image, label = train_dataset[i]
-        ax.imshow(crop_char_image(image, threshold=20./255.), cmap='Greys')
-        ax.set_title(f'label: {label}')
-    plt.tight_layout()
-
-
-# crop & resize test
-if False:
-    nrow, ncol = 5, 6
-
-    fig, axes = plt.subplots(nrow, ncol, figsize=(20, 8))
-    axes = axes.flatten()
-    for i, ax in tqdm(enumerate(axes)):
-        image, label = train_dataset[i]
-        ax.imshow(resize(crop_char_image(image, threshold=20./255.)), cmap='Greys')
-        ax.set_title(f'label: {label}')
-    plt.tight_layout()
-
 
 ### [Update] I added albumentations augmentations introduced in Bengali: albumentations data augmentation tutorial.
 import albumentations as A
@@ -356,12 +344,13 @@ def get_train_dataset_justfortest():
 _time_start = time.time()
 train = pd.read_csv(C.datadir/'train.csv')
 train_labels = train[['grapheme_root', 'vowel_diacritic', 'consonant_diacritic']].values
-indices = [0] if C.debug else [0, 1, 2, 3]
-train_images = prepare_image(
-    C.datadir, C.featherdir, data_type='train', submission=False, indices=indices)
-print(f'data load time was {time.time() - _time_start}')
+if False:  # not load feather when train
+    indices = [0] if C.debug else [0, 1, 2, 3]
+    train_images = prepare_image(
+        C.datadir, C.featherdir, data_type='train', submission=False, indices=indices)
+    print(f'data load time was {time.time() - _time_start}')
 
-def get_trainval_dataset():
+def get_trainval_dataset_feather():
     n_dataset = len(train_images)
     train_data_size = 200 if C.debug else int(n_dataset * 0.9)
     valid_data_size = 100 if C.debug else int(n_dataset - train_data_size)
@@ -378,6 +367,25 @@ def get_trainval_dataset():
 
     return train_dataset, valid_dataset
 
+def get_trainval_dataset():
+    from sklearn.model_selection import train_test_split
+    print(train.image_id.values.shape)
+    print(train_labels.shape)
+    x_train, x_valid, y_train, y_valid = train_test_split(
+        train.image_id.values,
+        train_labels,
+        train_size = 0.9
+    )
+    
+    train_dataset = BengaliAIDatasetPNG(
+        x_train, y_train, 
+        transform=Transform(size=(C.image_size, C.image_size)))
+    valid_dataset = BengaliAIDatasetPNG(
+        x_valid, y_valid, 
+        transform=Transform(affine=False, crop=True, size=(C.image_size, C.image_size)))
+    print('train_dataset', len(train_dataset), 'valid_dataset', len(valid_dataset))
+
+    return train_dataset, valid_dataset
 
 ########## COPYED FROM PREDICTION KERNEL #############
 # note. treth is 20, image_size is 128 for all 4 provided models
@@ -392,6 +400,43 @@ transform_test = Transform(affine=False, crop=True, size=(C.image_size, C.image_
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     train_dataset = BengaliAIDataset(train_images, train_labels)
+
+    if False:  # affine_image test
+        nrow, ncol = 1, 6
+
+        fig, axes = plt.subplots(nrow, ncol, figsize=(20, 8))
+        axes = axes.flatten()
+        for i, ax in tqdm(enumerate(axes)):
+            image, label = train_dataset[0]
+            ax.imshow(affine_image(image), cmap='Greys')
+            ax.set_title(f'label: {label}')
+        plt.tight_layout()
+
+    # crop test
+    if False:
+        nrow, ncol = 5, 6
+
+        fig, axes = plt.subplots(nrow, ncol, figsize=(20, 8))
+        axes = axes.flatten()
+        for i, ax in tqdm(enumerate(axes)):
+            image, label = train_dataset[i]
+            ax.imshow(crop_char_image(image, threshold=20./255.), cmap='Greys')
+            ax.set_title(f'label: {label}')
+        plt.tight_layout()
+
+
+    # crop & resize test
+    if False:
+        nrow, ncol = 5, 6
+
+        fig, axes = plt.subplots(nrow, ncol, figsize=(20, 8))
+        axes = axes.flatten()
+        for i, ax in tqdm(enumerate(axes)):
+            image, label = train_dataset[i]
+            ax.imshow(resize(crop_char_image(image, threshold=20./255.)), cmap='Greys')
+            ax.set_title(f'label: {label}')
+        plt.tight_layout()
+
 
     # visualize
     if True:
