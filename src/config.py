@@ -10,10 +10,11 @@ def _get_default_config():
     c = EasyDict()
 
     c.submission=False
-    c.batch_size=32
+
+    c.batch_size=128
     c.device='cuda:0' if torch.cuda.is_available() else 'cpu'
     c.out='.'
-    c.image_size=64
+    c.image_size=128
     c.arch='pretrained'
     c.model_name='se_resnext50_32x4d'
 
@@ -22,7 +23,8 @@ def _get_default_config():
     c.pngdir = Path('../input/bengaliai-cv19-png')
     c.outdir = Path('.')
 
-    c.n_epoch = 1
+    c.n_epoch = 10
+    c.num_workers = 4
 
     return c
 
