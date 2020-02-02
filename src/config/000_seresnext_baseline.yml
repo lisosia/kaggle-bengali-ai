@@ -1,2 +1,2 @@
-debug: True
-n_epoch: 1
+debug: False
+n_epoch: 10

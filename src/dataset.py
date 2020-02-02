@@ -130,7 +130,9 @@ class BengaliAIDatasetPNG(DatasetMixin):
 
     def get_example(self, i):
         """Return i-th data"""
-        x = cv2.imread(str(C.pngdir) + f'/Train_{i}.png', cv2.IMREAD_GRAYSCALE)
+        x = cv2.imread(
+            str(C.pngdir) + f'/{self.image_ids[i]}.png', 
+            cv2.IMREAD_GRAYSCALE)
         # Opposite white and black: background will be white and
         # for future Affine transformation
         x = (255 - x).astype(np.float32) / 255.
@@ -367,8 +369,8 @@ def get_trainval_dataset_feather():
 
     return train_dataset, valid_dataset
 
+from sklearn.model_selection import train_test_split
 def get_trainval_dataset():
-    from sklearn.model_selection import train_test_split
     print(train.image_id.values.shape)
     print(train_labels.shape)
     x_train, x_valid, y_train, y_valid = train_test_split(
