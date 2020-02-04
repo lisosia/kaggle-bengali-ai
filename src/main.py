@@ -319,9 +319,9 @@ from torch.utils.data.dataloader import DataLoader
 train_loader = DataLoader(train_dataset, batch_size=C.batch_size, shuffle=True, num_workers=C.num_workers)
 valid_loader = DataLoader(valid_dataset, batch_size=C.batch_size, shuffle=False, num_workers=C.num_workers)
 
-optimizer = torch.optim.Adam(classifier.parameters(), lr=0.001)
+optimizer = torch.optim.Adam(classifier.parameters(), lr=0.001 * C.batch_size / 32)  # 0.001 for bs=32
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-    optimizer, mode='min', factor=0.7, patience=5, min_lr=1e-10)
+    optimizer, mode='min', factor=0.5, patience=3, min_lr=1e-10)
 
 trainer = create_trainer(classifier, optimizer, device)
 def output_transform(output):
