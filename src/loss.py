@@ -38,8 +38,8 @@ def onehot(targets, num_classes):
     ###TEST### assert isinstance(targets, torch.LongTensor)
     return torch.zeros(targets.size()[0], num_classes).scatter_(1, targets.view(-1, 1), 1)
 
-
-def mixup_multi_targets(inputs, targets1, targets2, targets3, alpha=2):
+ALPHA = 0.4  # fastai kernel
+def mixup_multi_targets(inputs, targets1, targets2, targets3, alpha=ALPHA):
     """Mixup on 1x32x32 mel-spectrograms.
     """
     targets1, targets2, targets3 = onehot(targets1, 168), onehot(targets2, 11), onehot(targets3, 7)
@@ -59,7 +59,7 @@ def mixup_multi_targets(inputs, targets1, targets2, targets3, alpha=2):
 
     return inputs, targets1, targets2, targets3
 
-def mixup(inputs, targets, alpha=2):
+def mixup(inputs, targets, alpha=ALPHA):
     """Mixup on 1x32x32 mel-spectrograms.
     """
     s = inputs.size()[0]
@@ -73,7 +73,7 @@ def mixup(inputs, targets, alpha=2):
     targets = weight*y1 + (1-weight)*y2
     return inputs, targets
 
-def _mixup_not_onehot(inputs, targets, num_classes, alpha=2):
+def _mixup_not_onehot(inputs, targets, num_classes, alpha=ALPHA):
     """Mixup on 1x32x32 mel-spectrograms.
     """
     s = inputs.size()[0]
