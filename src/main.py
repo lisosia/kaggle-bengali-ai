@@ -33,7 +33,7 @@ from sklearn.model_selection import KFold
 
 # --- import local modules ---
 import config
-C = config.get_config("./config/000_seresnext_baseline.yml")
+C = config.get_config("./config/001_seresnext_mixup.yml")
 from dataset import *
 from model import *
 

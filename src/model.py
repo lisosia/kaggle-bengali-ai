@@ -3,6 +3,7 @@
 # Model
 #####################################################################
 import math
+import numpy as np
 import torch
 from torch import nn
 from torch.nn import init
@@ -13,6 +14,7 @@ from tqdm import tqdm
 
 import pretrainedmodels
 
+from loss import *
 
 def residual_add(lhs, rhs):
     lhs_ch, rhs_ch = lhs.shape[1], rhs.shape[1]
@@ -194,6 +196,27 @@ class BengaliClassifier(nn.Module):
             'acc_grapheme', 'acc_vowel', 'acc_consonant']
 
     def forward(self, x, y=None):
+        if y is not None:
+            y0, y1, y2 = y[:, 0], y[:, 1], y[:, 2]
+            if False:  # debug. to delete 
+                #y = torch.cuda.LongTensor(y)
+                print(y.dtype)
+                print(y.dtype)
+                print(type(y))
+                print(y[:, 0])
+                print(y[:, 1])
+                print(y[:, 2])
+                print(y0)
+                print(y1)
+                print(y2)
+            do_mixup = np.random.rand() > 0.5
+            if do_mixup:
+                x, y0, y1, y2 = mixup_multi_targets(x.cpu(), y0.cpu(), y1.cpu(), y2.cpu())
+                x  = x.cuda()
+                y0 = y0.cuda()
+                y1 = y1.cuda()
+                y2 = y2.cuda()
+                
         pred = self.predictor(x)
         if isinstance(pred, tuple):
             assert len(pred) == 3
@@ -201,9 +224,10 @@ class BengaliClassifier(nn.Module):
         else:
             assert pred.shape[1] == self.n_total_class
             preds = torch.split(pred, [self.n_grapheme, self.n_vowel, self.n_consonant], dim=1)
-        loss_grapheme = F.cross_entropy(preds[0], y[:, 0])
-        loss_vowel = F.cross_entropy(preds[1], y[:, 1])
-        loss_consonant = F.cross_entropy(preds[2], y[:, 2])
+        _loss_func = mixup_cross_entropy_loss if do_mixup else torch.nn.functional.cross_entropy
+        loss_grapheme = _loss_func(preds[0], y0)
+        loss_vowel = _loss_func(preds[1], y1)
+        loss_consonant = _loss_func(preds[2], y2)
         loss = loss_grapheme + loss_vowel + loss_consonant
         metrics = {
             'loss': loss.item(),

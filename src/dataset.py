@@ -94,7 +94,7 @@ class BengaliAIDataset(DatasetMixin):
     def __init__(self, images, labels=None, transform=None, indices=None):
         super(BengaliAIDataset, self).__init__(transform=transform)
         self.images = images
-        self.labels = labels
+        self.labels = labels.astype(np.int64)
         if indices is None:
             indices = np.arange(len(images))
         self.indices = indices
@@ -116,6 +116,11 @@ class BengaliAIDataset(DatasetMixin):
             return x, y
         else:
             return x
+
+def get_onehot(index, num_class):
+    e = np.zeros(num_class, np.float)
+    e[index] = 1.
+    return e
 
 class BengaliAIDatasetPNG(DatasetMixin):
     def __init__(self, image_ids, labels=None, transform=None):
