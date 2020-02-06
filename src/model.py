@@ -3,6 +3,7 @@
 # Model
 #####################################################################
 import math
+import numpy as np
 import torch
 from torch import nn
 from torch.nn import init
@@ -13,6 +14,7 @@ from tqdm import tqdm
 
 import pretrainedmodels
 
+from loss import *
 
 def residual_add(lhs, rhs):
     lhs_ch, rhs_ch = lhs.shape[1], rhs.shape[1]
@@ -172,14 +174,6 @@ class PretrainedCNN(nn.Module):
 
 
 ### Classifer
-
-def accuracy(y, t):
-    pred_label = torch.argmax(y, dim=1)
-    count = pred_label.shape[0]
-    correct = (pred_label == t).sum().type(torch.float32)
-    acc = correct / count
-    return acc
-
 class BengaliClassifier(nn.Module):
     def __init__(self, predictor, n_grapheme=168, n_vowel=11, n_consonant=7):
         super(BengaliClassifier, self).__init__()
@@ -193,7 +187,8 @@ class BengaliClassifier(nn.Module):
             'loss', 'loss_grapheme', 'loss_vowel', 'loss_consonant',
             'acc_grapheme', 'acc_vowel', 'acc_consonant']
 
-    def forward(self, x, y=None):
+    def forward(self, x):
+                
         pred = self.predictor(x)
         if isinstance(pred, tuple):
             assert len(pred) == 3
@@ -201,20 +196,7 @@ class BengaliClassifier(nn.Module):
         else:
             assert pred.shape[1] == self.n_total_class
             preds = torch.split(pred, [self.n_grapheme, self.n_vowel, self.n_consonant], dim=1)
-        loss_grapheme = F.cross_entropy(preds[0], y[:, 0])
-        loss_vowel = F.cross_entropy(preds[1], y[:, 1])
-        loss_consonant = F.cross_entropy(preds[2], y[:, 2])
-        loss = loss_grapheme + loss_vowel + loss_consonant
-        metrics = {
-            'loss': loss.item(),
-            'loss_grapheme': loss_grapheme.item(),
-            'loss_vowel': loss_vowel.item(),
-            'loss_consonant': loss_consonant.item(),
-            'acc_grapheme': accuracy(preds[0], y[:, 0]),
-            'acc_vowel': accuracy(preds[1], y[:, 1]),
-            'acc_consonant': accuracy(preds[2], y[:, 2]),
-        }
-        return loss, metrics, pred
+        return preds
 
     def calc(self, data_loader):
         device: torch.device = next(self.parameters()).device

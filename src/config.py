@@ -26,6 +26,7 @@ def _get_default_config():
     c.n_epoch = 10
     c.num_workers = 4
 
+    c.num_classes = [168, 11, 7]
     return c
 
 
