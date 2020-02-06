@@ -174,14 +174,6 @@ class PretrainedCNN(nn.Module):
 
 
 ### Classifer
-
-def accuracy(y, t):
-    pred_label = torch.argmax(y, dim=1)
-    count = pred_label.shape[0]
-    correct = (pred_label == t).sum().type(torch.float32)
-    acc = correct / count
-    return acc
-
 class BengaliClassifier(nn.Module):
     def __init__(self, predictor, n_grapheme=168, n_vowel=11, n_consonant=7):
         super(BengaliClassifier, self).__init__()
@@ -195,27 +187,7 @@ class BengaliClassifier(nn.Module):
             'loss', 'loss_grapheme', 'loss_vowel', 'loss_consonant',
             'acc_grapheme', 'acc_vowel', 'acc_consonant']
 
-    def forward(self, x, y=None):
-        if y is not None:
-            y0, y1, y2 = y[:, 0], y[:, 1], y[:, 2]
-            if False:  # debug. to delete 
-                #y = torch.cuda.LongTensor(y)
-                print(y.dtype)
-                print(y.dtype)
-                print(type(y))
-                print(y[:, 0])
-                print(y[:, 1])
-                print(y[:, 2])
-                print(y0)
-                print(y1)
-                print(y2)
-            do_mixup = np.random.rand() > 0.5
-            if do_mixup:
-                x, y0, y1, y2 = mixup_multi_targets(x.cpu(), y0.cpu(), y1.cpu(), y2.cpu())
-                x  = x.cuda()
-                y0 = y0.cuda()
-                y1 = y1.cuda()
-                y2 = y2.cuda()
+    def forward(self, x):
                 
         pred = self.predictor(x)
         if isinstance(pred, tuple):
@@ -224,21 +196,7 @@ class BengaliClassifier(nn.Module):
         else:
             assert pred.shape[1] == self.n_total_class
             preds = torch.split(pred, [self.n_grapheme, self.n_vowel, self.n_consonant], dim=1)
-        _loss_func = mixup_cross_entropy_loss if do_mixup else torch.nn.functional.cross_entropy
-        loss_grapheme = _loss_func(preds[0], y0)
-        loss_vowel = _loss_func(preds[1], y1)
-        loss_consonant = _loss_func(preds[2], y2)
-        loss = loss_grapheme + loss_vowel + loss_consonant
-        metrics = {
-            'loss': loss.item(),
-            'loss_grapheme': loss_grapheme.item(),
-            'loss_vowel': loss_vowel.item(),
-            'loss_consonant': loss_consonant.item(),
-            'acc_grapheme': accuracy(preds[0], y[:, 0]),
-            'acc_vowel': accuracy(preds[1], y[:, 1]),
-            'acc_consonant': accuracy(preds[2], y[:, 2]),
-        }
-        return loss, metrics, pred
+        return preds
 
     def calc(self, data_loader):
         device: torch.device = next(self.parameters()).device
