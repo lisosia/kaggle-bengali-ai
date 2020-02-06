@@ -161,20 +161,20 @@ class BengaliModule(pl.LightningModule):
 
         _, logs, y_hat_arr = self._calc_loss_metric(preds, y0, y1, y2)
 
-        return {'log' : logs, 
+        return {'_val_log' : logs, 
                 'y_true' : y.cpu().numpy(),
                 'y_hat' : y_hat_arr}
 
     def validation_end(self, outputs):
         # OPTIONAL
-        keys = outputs[0]['log'].keys()
+        keys = outputs[0]['_val_log'].keys()
         tf_logs = {}
         for key in keys:
-            tf_logs['avg_' + key] = np.stack([x['log'][key] for x in outputs]).mean()
+            tf_logs['avg_' + key] = np.stack([x['_val_log'][key] for x in outputs]).mean()
         ### print( len ( self.trainer.lr_schedulers ))
         ### tf_logs['lr'] = self.trainer.lr_schedulers[0].optimizer.param_groups[0]['lr']
 
-        return {'avg_val_loss': tf_logs['avg_loss'], 'log': tf_logs}
+        return {'val_loss': tf_logs['avg_loss'], 'log': tf_logs}
         
     # def test_step(self, batch, batch_idx):
     #     # OPTIONAL
