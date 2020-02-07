@@ -110,7 +110,7 @@ class BengaliModule(pl.LightningModule):
         return self.classifier(x.to(device))  # todo return [logi1, logi2, logi3]
 
     @staticmethod
-    def _calc_loss_metric(preds, y0, y1, y2):
+    def _calc_loss_metric(preds, y0, y1, y2, log_prefix):
         """return loss(torch.Tensor) and log(not Tensor)"""
         # _loss_func = mixup_cross_entropy_loss if do_mixup else torch.nn.functional.cross_entropy
         loss_grapheme = mixup_cross_entropy_loss(preds[0], y0)
@@ -122,13 +122,13 @@ class BengaliModule(pl.LightningModule):
         acc_vowel, y_hat1 = accuracy(preds[1], y1)
         acc_consonant, y_hat2 = accuracy(preds[2], y2)
         logs = {
-            'loss': loss.item(),
-            'loss_grapheme': loss_grapheme.item(),
-            'loss_vowel': loss_vowel.item(),
-            'loss_consonant': loss_consonant.item(),
-            'acc_grapheme': acc_grapheme,
-            'acc_vowel': acc_vowel,
-            'acc_consonant': acc_consonant,
+            f'loss/{log_prefix}_total_loss': loss.item(),
+            f'loss/{log_prefix}_loss_grapheme': loss_grapheme.item(),
+            f'loss/{log_prefix}_loss_vowel': loss_vowel.item(),
+            f'loss/{log_prefix}_loss_consonant': loss_consonant.item(),
+            f'acc/{log_prefix}_acc_grapheme': acc_grapheme,
+            f'acc/{log_prefix}_acc_vowel': acc_vowel,
+            f'acc/{log_prefix}_acc_consonant': acc_consonant,
         }
         return loss, logs, [y_hat0, y_hat1, y_hat2]
 
@@ -145,7 +145,7 @@ class BengaliModule(pl.LightningModule):
             y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
 
         preds = self.forward(x)
-        loss, logs, _ = self._calc_loss_metric(preds, y0, y1, y2)
+        loss, logs, _ = self._calc_loss_metric(preds, y0, y1, y2, log_prefix='train')
 
         return {'loss': loss, 'log': logs}
 
@@ -158,7 +158,7 @@ class BengaliModule(pl.LightningModule):
 
         preds = self.forward(x)
 
-        _, logs, y_hat_arr = self._calc_loss_metric(preds, y0, y1, y2)
+        _, logs, y_hat_arr = self._calc_loss_metric(preds, y0, y1, y2, log_prefix='val')
 
         return {'_val_log' : logs, 
                 'y_true' : y.cpu().numpy(),
@@ -169,11 +169,12 @@ class BengaliModule(pl.LightningModule):
         keys = outputs[0]['_val_log'].keys()
         tf_logs = {}
         for key in keys:
-            tf_logs['avg_' + key] = np.stack([x['_val_log'][key] for x in outputs]).mean()
+            tf_logs[key] = np.stack([x['_val_log'][key] for x in outputs]).mean()
+            # tf_logs['avg_' + key] = np.stack([x['_val_log'][key] for x in outputs]).mean()
         ### print( len ( self.trainer.lr_schedulers ))
         ### tf_logs['lr'] = self.trainer.lr_schedulers[0].optimizer.param_groups[0]['lr']
 
-        return {'val_loss': tf_logs['avg_loss'], 'log': tf_logs}
+        return {'val_loss': tf_logs['loss/val_total_loss'], 'log': tf_logs}
         
     # def test_step(self, batch, batch_idx):
     #     # OPTIONAL
