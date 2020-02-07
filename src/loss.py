@@ -15,6 +15,9 @@ import numpy as np
 import torch
 from torch.autograd import Variable
 
+import config
+C = config.get_config("./config/001_seresnext_mixup.yml")
+
 def mixup_cross_entropy_loss(input, target, size_average=True):
     """Origin: https://github.com/moskomule/mixup.pytorch
     in PyTorch's cross entropy, targets are expected to be labels
@@ -36,7 +39,7 @@ def onehot(targets, num_classes):
     :param num_classes: number of classes
     """
     ###TEST### assert isinstance(targets, torch.LongTensor)
-    return torch.zeros(targets.size()[0], num_classes).scatter_(1, targets.view(-1, 1), 1)
+    return torch.zeros(targets.size()[0], num_classes).to(C.device).scatter_(1, targets.view(-1, 1), 1)
 
 ALPHA = 0.4  # fastai kernel
 def mixup_multi_targets(inputs, targets1, targets2, targets3, alpha=ALPHA):
@@ -45,7 +48,7 @@ def mixup_multi_targets(inputs, targets1, targets2, targets3, alpha=ALPHA):
     targets1, targets2, targets3 = onehot(targets1, 168), onehot(targets2, 11), onehot(targets3, 7)
 
     s = inputs.size()[0]
-    weight = torch.Tensor(np.random.beta(alpha, alpha, s))
+    weight = torch.Tensor(np.random.beta(alpha, alpha, s)).to(C.device)
     index = np.random.permutation(s)
 
     x1, x2 = inputs, inputs[index, :, :, :]

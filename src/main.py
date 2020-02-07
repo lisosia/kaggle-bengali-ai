@@ -47,7 +47,6 @@ pd.set_option('max_columns', 50)
 train_dataset, valid_dataset = get_trainval_dataset()
 device = torch.device(C.device)
 
-
 def macro_recall(pred_y, y, n_grapheme=168, n_vowel=11, n_consonant=7):
     pred_y = torch.split(pred_y, [n_grapheme, n_vowel, n_consonant], dim=1)
     pred_labels = [torch.argmax(py, dim=1).cpu().numpy() for py in pred_y]
@@ -108,7 +107,7 @@ class BengaliModule(pl.LightningModule):
         self.classifier = BengaliClassifier(predictor).to(device)
 
     def forward(self, x):
-        return self.classifier(x)  # todo return [logi1, logi2, logi3]
+        return self.classifier(x.to(device))  # todo return [logi1, logi2, logi3]
 
     @staticmethod
     def _calc_loss_metric(preds, y0, y1, y2):
@@ -136,13 +135,12 @@ class BengaliModule(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         # REQUIRED
         x, y = batch
+        x, y = x.to(C.device), y.to(C.device)
         y0, y1, y2 = y[:, 0], y[:, 1], y[:, 2]
 
         do_mixup = np.random.rand() > 0.5
         if do_mixup:
-            x, y0, y1, y2 = mixup_multi_targets(x.cpu(), y0.cpu(), y1.cpu(), y2.cpu())
-            x  = x.to(C.device)
-            y0, y1, y2 = y0.to(C.device), y1.to(C.device), y2.to(C.device)
+            x, y0, y1, y2 = mixup_multi_targets(x, y0, y1, y2)
         else:
             y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
 
@@ -154,6 +152,7 @@ class BengaliModule(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         # OPTIONAL
         x, y = batch
+        x, y = x.to(C.device), y.to(C.device)
         y0, y1, y2 = y[:, 0], y[:, 1], y[:, 2]
         y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
 
