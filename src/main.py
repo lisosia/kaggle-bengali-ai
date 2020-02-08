@@ -212,7 +212,32 @@ class BengaliModule(pl.LightningModule):
     #     # OPTIONAL
     #     return DataLoader(MNIST(os.getcwd(), train=False, download=True, transform=transforms.ToTensor()), batch_size=32)
 
+def train():
+    m = BengaliModule()
+    trainer = pl.Trainer(
+        early_stop_callback=None, max_epochs=C.n_epoch)
+    trainer.fit(m)
 
-m = BengaliModule()
-trainer = pl.Trainer()
-trainer.fit(m)
+
+# resutre trainer
+    # trainer = pl.Trainer()
+    # trainer.restore(path, torch.cuda.is_available())
+
+# proper way to load is calling BengaliModule.load_from_checkpoint(path)
+#   m = BengaliModule.load_from_checkpoint(path)
+# It seems load_from_checkpoint() assume I passed hparams arg when training?
+def _load(checkpoint_path, map_location=None):
+    checkpoint = torch.load(checkpoint_path, map_location=map_location)
+    m = BengaliModule()
+    m.load_state_dict(checkpoint['state_dict'])
+    return m
+
+def test():
+    path = './lightning_logs/version_5/checkpoints/_ckpt_epoch_27.ckpt'
+    m = _load(path)
+    
+    ret = m.forward(torch.Tensor(np.random.randn(3, 1, 128, 128)))
+    print(ret[0].shape, ret[1].shape, ret[2].shape)
+
+if __name__ == "__main__":
+    test()

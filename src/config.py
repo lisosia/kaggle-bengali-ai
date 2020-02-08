@@ -60,7 +60,7 @@ def get_config(config_path=None):
     _merge_config(yaml_config, config)
 
     config.outdir = f'../run/{os.path.basename(config_path)}'
-    os.makedirs(config.outdir)
+    os.makedirs(config.outdir, exist_ok=True)
 
     global_config = config
 
