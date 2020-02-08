@@ -9,28 +9,15 @@ import numpy
 import time
 from time import perf_counter
 
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-from IPython.core.display import display, HTML
-
-import torch
-
-# --- plotly ---
-from plotly import tools, subplots
-import plotly.offline as py
-py.init_notebook_mode(connected=True)
-import plotly.graph_objs as go
-import plotly.express as px
-import plotly.figure_factory as ff
+# import matplotlib.pyplot as plt
+# import seaborn as sns
 
 import sklearn.metrics
 from sklearn.model_selection import KFold
 
-from distutils.util import strtobool
 import torch
 from torch.utils.data.dataloader import DataLoader
 import pytorch_lightning as pl
@@ -100,7 +87,6 @@ class BengaliModule(pl.LightningModule):
 
     def __init__(self):
         super(BengaliModule, self).__init__()
-        self.train_dataset, self.valid_dataset = get_trainval_dataset()
         self.device = torch.device(C.device)
 
         n_grapheme = 168
@@ -108,11 +94,14 @@ class BengaliModule(pl.LightningModule):
         n_consonant = 7
         n_total = n_grapheme + n_vowel + n_consonant
         print('n_total', n_total)
-        # Set pretrained='imagenet' to download imagenet pretrained model...
-        predictor = PretrainedCNN(in_channels=1, out_dim=n_total, model_name=C.model_name, pretrained=None)
-        print('predictor', type(predictor))
 
+        # Set pretrained='imagenet' to download imagenet pretrained model...
+        predictor = PretrainedCNN(in_channels=1, out_dim=n_total, model_name=C.model_name, pretrained=None).to(self.device)
+        print('predictor', type(predictor))
         self.classifier = BengaliClassifier(predictor).to(self.device)
+
+        # load data after model is in cuda
+        self.train_dataset, self.valid_dataset = get_trainval_dataset()
 
     def forward(self, x):
         return self.classifier(x.to(self.device))  # todo return [logi1, logi2, logi3]
@@ -239,7 +228,8 @@ class BengaliModule(pl.LightningModule):
 def train(args):
     m = BengaliModule()
     trainer = pl.Trainer(
-        early_stop_callback=None, max_epochs=C.n_epoch)
+        early_stop_callback=None, max_epochs=C.n_epoch,
+        use_amp=False)
     trainer.fit(m)
 
 

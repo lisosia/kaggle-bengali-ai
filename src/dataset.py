@@ -21,22 +21,29 @@ def prepare_image(datadir, featherdir, data_type='train',
                   submission=False, indices=[0, 1, 2, 3]):
     assert data_type in ['train', 'test']
     print("prepare_image() start")
-    if submission:  # read from parquet when submission
-        image_df_list = [pd.read_parquet(datadir / f'{data_type}_image_data_{i}.parquet')
-                         for i in indices]
-    else:  # read from feather for speed
-        image_df_list = [pd.read_feather(featherdir / f'{data_type}_image_data_{i}.feather')
-                         for i in indices]
-
-    print('image_df_list', len(image_df_list))
+    
     HEIGHT = 137
     WIDTH = 236
-    images = [df.iloc[:, 1:].values.reshape(-1, HEIGHT, WIDTH) for df in image_df_list]
-    del image_df_list
+
+    PER_INDEX = 50210
+    images_all = np.zeros((PER_INDEX * len(indices), 137, 236), dtype=np.uint8)
+    print("    allocated:", images_all.shape)
+    for i in indices:
+        if submission:  # read from parquet when submission
+            df = pd.read_parquet(datadir / f'{data_type}_image_data_{i}.parquet')
+        else:
+            df = pd.read_feather(featherdir / f'{data_type}_image_data_{i}.feather')
+            
+        assert len(df) == PER_INDEX
+        images_all[PER_INDEX*i: PER_INDEX*(i+1)] = df.iloc[:, 1:].values.reshape(-1, HEIGHT, WIDTH).astype(np.uint8)
+        del df
+        gc.collect()
+
+        print(f'    indice {i} done')
+
     gc.collect()
-    images = np.concatenate(images, axis=0)
     print("prepare_image() end")
-    return images
+    return images_all
 
 #####################################################################
 # Dataset
@@ -349,34 +356,37 @@ def get_train_dataset_justfortest():
                                  transform=train_transform)
 
 # load data
-_time_start = time.time()
 train = pd.read_csv(C.datadir/'train.csv')
 train_labels = train[['grapheme_root', 'vowel_diacritic', 'consonant_diacritic']].values
-if False:  # not load feather when train
-    indices = [0] if C.debug else [0, 1, 2, 3]
+
+def get_trainval_dataset():
+    _time_start = time.time()
+    indices = [0, 1, 2, 3]
+    # indices = [0, 1, 2]
     train_images = prepare_image(
         C.datadir, C.featherdir, data_type='train', submission=False, indices=indices)
     print(f'data load time was {time.time() - _time_start}')
 
-def get_trainval_dataset_feather():
     n_dataset = len(train_images)
-    train_data_size = 200 if C.debug else int(n_dataset * 0.9)
-    valid_data_size = 100 if C.debug else int(n_dataset - train_data_size)
+    train_data_size = int(n_dataset * 0.9)
+    valid_data_size = int(n_dataset - train_data_size)
 
     perm = np.random.RandomState(777).permutation(n_dataset)
     print('perm', perm)
     train_dataset = BengaliAIDataset(
-        train_images, train_labels, transform=Transform(size=(C.image_size, C.image_size)),
+        train_images, train_labels,
+        transform=Transform(size=(C.image_size, C.image_size)),
         indices=perm[:train_data_size])
     valid_dataset = BengaliAIDataset(
-        train_images, train_labels, transform=Transform(affine=False, crop=True, size=(C.image_size, C.image_size)),
+        train_images, train_labels,
+        transform=Transform(affine=False, crop=True, size=(C.image_size, C.image_size)),
         indices=perm[train_data_size:train_data_size+valid_data_size])
-    print('train_dataset', len(train_dataset), 'valid_dataset', len(valid_dataset))
 
+    print('train_dataset', len(train_dataset), 'valid_dataset', len(valid_dataset))
     return train_dataset, valid_dataset
 
 from sklearn.model_selection import train_test_split
-def get_trainval_dataset():
+def get_trainval_dataset_png():
     print(train.image_id.values.shape)
     print(train_labels.shape)
     x_train, x_valid, y_train, y_valid = train_test_split(
