@@ -101,7 +101,7 @@ class BengaliModule(pl.LightningModule):
         self.classifier = BengaliClassifier(predictor).to(self.device)
 
         # load data after model is in cuda
-        self.train_dataset, self.valid_dataset = get_trainval_dataset()
+        self.train_dataset, self.valid_dataset = get_trainval_dataset_png()
 
     def forward(self, x):
         return self.classifier(x.to(self.device))  # todo return [logi1, logi2, logi3]

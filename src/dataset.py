@@ -17,9 +17,33 @@ C = config.get_config()
 #####################################################################
 # cache as feather format
 # pickle may be faster? https://blog.amedama.jp/entry/2018/07/11/081050
+
+def prepare_image_test(datadir, featherdir, submission=False, indices=[0, 1, 2, 3]):
+    assert data_type in ['train', 'test']
+    print("prepare_image() start")
+    if submission:  # read from parquet when submission
+        image_df_list = [pd.read_parquet(datadir / f'{data_type}_image_data_{i}.parquet')
+                         for i in indices]
+    else:  # read from feather for speed
+        image_df_list = [pd.read_feather(featherdir / f'{data_type}_image_data_{i}.feather')
+                         for i in indices]
+
+    print('image_df_list', len(image_df_list))
+    HEIGHT = 137
+    WIDTH = 236
+    images = [df.iloc[:, 1:].values.reshape(-1, HEIGHT, WIDTH) for df in image_df_list]
+    del image_df_list
+    gc.collect()
+    images = np.concatenate(images, axis=0)
+    print("prepare_image() end")
+    return images
+
 def prepare_image(datadir, featherdir, data_type='train',
                   submission=False, indices=[0, 1, 2, 3]):
     assert data_type in ['train', 'test']
+    if data_type == 'test':  # for test, same as before
+        return prepare_image_test(datadir, featherdir, submission, indices)
+    
     print("prepare_image() start")
     
     HEIGHT = 137
