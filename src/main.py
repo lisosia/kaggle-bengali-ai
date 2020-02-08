@@ -37,7 +37,7 @@ import pytorch_lightning as pl
 
 # --- import local modules ---
 import config
-C = config.get_config("./config/001_seresnext_mixup.yml")
+C = config.get_config("./config/002_seresnext_mixup_adamw.yml")
 from dataset import *
 from model import *
 
@@ -47,16 +47,10 @@ pd.set_option('max_columns', 50)
 train_dataset, valid_dataset = get_trainval_dataset()
 device = torch.device(C.device)
 
-def macro_recall(pred_y, y, n_grapheme=168, n_vowel=11, n_consonant=7):
-    pred_y = torch.split(pred_y, [n_grapheme, n_vowel, n_consonant], dim=1)
-    pred_labels = [torch.argmax(py, dim=1).cpu().numpy() for py in pred_y]
-
-    y = y.cpu().numpy()
-    # pred_y = [p.cpu().numpy() for p in pred_y]
-
-    recall_grapheme = sklearn.metrics.recall_score(pred_labels[0], y[:, 0], average='macro')
-    recall_vowel = sklearn.metrics.recall_score(pred_labels[1], y[:, 1], average='macro')
-    recall_consonant = sklearn.metrics.recall_score(pred_labels[2], y[:, 2], average='macro')
+def macro_recall(y_true, pred_y, n_grapheme=168, n_vowel=11, n_consonant=7):
+    recall_grapheme  = sklearn.metrics.recall_score(y_true[0], pred_y[0], average='macro')
+    recall_vowel     = sklearn.metrics.recall_score(y_true[1], pred_y[1], average='macro')
+    recall_consonant = sklearn.metrics.recall_score(y_true[2], pred_y[2], average='macro')
     scores = [recall_grapheme, recall_vowel, recall_consonant]
     final_score = np.average(scores, weights=[2, 1, 1])
     # print(f'recall: grapheme {recall_grapheme}, vowel {recall_vowel}, consonant {recall_consonant}, '
@@ -163,8 +157,9 @@ class BengaliModule(pl.LightningModule):
         _, logs, y_hat_arr = self._calc_loss_metric(preds, y0, y1, y2, log_prefix='val')
 
         return {'_val_log' : logs, 
-                'y_true' : y.cpu().numpy(),
-                'y_hat' : y_hat_arr}
+                'y_true' : np.swapaxes(y.cpu().numpy(), 0, 1),  # shape is class(3), B
+                'y_hat' : y_hat_arr
+               }
 
     def validation_end(self, outputs):
         # OPTIONAL
@@ -172,9 +167,13 @@ class BengaliModule(pl.LightningModule):
         tf_logs = {}
         for key in keys:
             tf_logs[key] = np.stack([x['_val_log'][key] for x in outputs]).mean()
-            # tf_logs['avg_' + key] = np.stack([x['_val_log'][key] for x in outputs]).mean()
         ### print( len ( self.trainer.lr_schedulers ))
         ### tf_logs['lr'] = self.trainer.lr_schedulers[0].optimizer.param_groups[0]['lr']
+
+        y_true = [np.concatenate([x['y_true'][i] for x in outputs]) for i in range(3)]
+        y_hat  = [np.concatenate([x['y_hat'][i]  for x in outputs]) for i in range(3)]
+        recall = macro_recall(y_true, y_hat)
+        tf_logs['recall'] = recall
 
         return {'val_loss': tf_logs['loss/val_total_loss'], 'log': tf_logs}
         
@@ -194,9 +193,9 @@ class BengaliModule(pl.LightningModule):
         # REQUIRED
         # can return multiple optimizers and learning_rate schedulers
         # (LBFGS it is automatically supported, no need for closure function)
-        optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=0.001 * C.batch_size / 32)  # 0.001 for bs=32
+        optimizer =  torch.optim.AdamW(self.classifier.parameters(), lr=0.001 * C.batch_size / 32)  # 0.001 for bs=32
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='min', factor=0.5, patience=3, min_lr=1e-10)
+            optimizer, mode='min', factor=0.2, patience=3, min_lr=1e-10)
         return [optimizer], [scheduler]
 
     @pl.data_loader
@@ -298,4 +297,5 @@ def test():
 
 
 if __name__ == "__main__":
-    test()
+    train()
+    # test()
