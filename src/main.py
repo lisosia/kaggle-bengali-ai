@@ -37,15 +37,25 @@ import pytorch_lightning as pl
 
 # --- import local modules ---
 import config
-C = config.get_config("./config/002_seresnext_mixup_adamw.yml")
+if True:
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(title="subcommands", dest="subcommand")
+
+    train_parser = subparsers.add_parser("train")
+    test_parser = subparsers.add_parser("test")
+    
+    train_parser.add_argument('--config', required=True)
+    args = parser.parse_args()
+    print(args)
+    # C = config.get_config("./config/002_seresnext_mixup_adamw.yml")
+    C = config.get_config(args.config)
+
 from dataset import *
 from model import *
 
 # --- setup ---
 pd.set_option('max_columns', 50)
 
-train_dataset, valid_dataset = get_trainval_dataset()
-device = torch.device(C.device)
 
 def macro_recall(y_true, pred_y, n_grapheme=168, n_vowel=11, n_consonant=7):
     recall_grapheme  = sklearn.metrics.recall_score(y_true[0], pred_y[0], average='macro')
@@ -90,6 +100,8 @@ class BengaliModule(pl.LightningModule):
 
     def __init__(self):
         super(BengaliModule, self).__init__()
+        self.train_dataset, self.valid_dataset = get_trainval_dataset()
+        self.device = torch.device(C.device)
 
         n_grapheme = 168
         n_vowel = 11
@@ -100,10 +112,10 @@ class BengaliModule(pl.LightningModule):
         predictor = PretrainedCNN(in_channels=1, out_dim=n_total, model_name=C.model_name, pretrained=None)
         print('predictor', type(predictor))
 
-        self.classifier = BengaliClassifier(predictor).to(device)
+        self.classifier = BengaliClassifier(predictor).to(self.device)
 
     def forward(self, x):
-        return self.classifier(x.to(device))  # todo return [logi1, logi2, logi3]
+        return self.classifier(x.to(self.device))  # todo return [logi1, logi2, logi3]
 
     @staticmethod
     def _calc_loss_metric(preds, y0, y1, y2, log_prefix):
@@ -131,7 +143,7 @@ class BengaliModule(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         # REQUIRED
         x, y = batch
-        x, y = x.to(C.device), y.to(C.device)
+        x, y = x.to(self.device), y.to(self.device)
         y0, y1, y2 = y[:, 0], y[:, 1], y[:, 2]
 
         do_mixup = np.random.rand() > 0.5
@@ -148,7 +160,7 @@ class BengaliModule(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         # OPTIONAL
         x, y = batch
-        x, y = x.to(C.device), y.to(C.device)
+        x, y = x.to(self.device), y.to(self.device)
         y0, y1, y2 = y[:, 0], y[:, 1], y[:, 2]
         y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
 
@@ -195,18 +207,18 @@ class BengaliModule(pl.LightningModule):
         # (LBFGS it is automatically supported, no need for closure function)
         optimizer =  torch.optim.AdamW(self.classifier.parameters(), lr=0.001 * C.batch_size / 32)  # 0.001 for bs=32
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='min', factor=0.2, patience=3, min_lr=1e-10)
+            optimizer, mode='min', factor=0.5, patience=3, min_lr=1e-10)
         return [optimizer], [scheduler]
 
     @pl.data_loader
     def train_dataloader(self):
         # REQUIRED
-        return DataLoader(train_dataset, batch_size=C.batch_size, shuffle=True, num_workers=C.num_workers)
+        return DataLoader(self.train_dataset, batch_size=C.batch_size, shuffle=True, num_workers=C.num_workers)
 
     @pl.data_loader
     def val_dataloader(self):
         # OPTIONAL
-        return DataLoader(valid_dataset, batch_size=C.batch_size, shuffle=False, num_workers=C.num_workers)
+        return DataLoader(self.valid_dataset, batch_size=C.batch_size, shuffle=False, num_workers=C.num_workers)
 
     # @pl.data_loader
     # def test_dataloader(self):
@@ -217,14 +229,14 @@ class BengaliModule(pl.LightningModule):
         arr0, arr1, arr2 = [], [], []
         for x in loader:
             with torch.no_grad():
-                preds0, preds1, preds2 = self.forward(x.to(C.device))
+                preds0, preds1, preds2 = self.forward(x.to(self.device))
             arr0.append(np.apply_along_axis(softmax, -1, preds0.cpu().numpy()))
             arr1.append(np.apply_along_axis(softmax, -1, preds1.cpu().numpy()))
             arr2.append(np.apply_along_axis(softmax, -1, preds2.cpu().numpy()))
         return np.concatenate(arr0), np.concatenate(arr1), np.concatenate(arr2)
 
 
-def train():
+def train(args):
     m = BengaliModule()
     trainer = pl.Trainer(
         early_stop_callback=None, max_epochs=C.n_epoch)
@@ -246,10 +258,10 @@ def _load(checkpoint_path, map_location=None):
 
 def test():
     path = './lightning_logs/version_5/checkpoints/_ckpt_epoch_27.ckpt'
-    model = _load(path).to(device)
+    model = _load(path).to(C.device)
     model.eval()
     
-    ret = model.forward(torch.Tensor(np.random.randn(3, 1, 128, 128)).to(device))
+    ret = model.forward(torch.Tensor(np.random.randn(3, 1, 128, 128)).to(C.device))
     print(ret[0].shape, ret[1].shape, ret[2].shape)
     
     preds0, preds1, preds2 = [], [], []
@@ -297,5 +309,8 @@ def test():
 
 
 if __name__ == "__main__":
-    train()
-    # test()
+
+    if args.subcommand == 'train':
+        train(args)
+    elif args.subcommand == 'test':
+        test()
