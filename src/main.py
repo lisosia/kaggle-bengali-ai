@@ -194,7 +194,7 @@ class BengaliModule(pl.LightningModule):
         # REQUIRED
         # can return multiple optimizers and learning_rate schedulers
         # (LBFGS it is automatically supported, no need for closure function)
-        optimizer =  torch.optim.AdamW(self.classifier.parameters(), lr=0.001 * C.batch_size / 32)  # 0.001 for bs=32
+        optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=0.001 * C.batch_size / 32)  # 0.001 for bs=32
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, mode='min', factor=0.5, patience=3, min_lr=1e-10)
         return [optimizer], [scheduler]
@@ -229,7 +229,7 @@ def train(args):
     m = BengaliModule()
     trainer = pl.Trainer(
         early_stop_callback=None, max_epochs=C.n_epoch,
-        use_amp=False)
+        gpus=1, use_amp=False)
     trainer.fit(m)
 
 
