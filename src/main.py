@@ -135,9 +135,10 @@ class BengaliModule(pl.LightningModule):
         x, y = x.to(self.device), y.to(self.device)
         y0, y1, y2 = y[:, 0], y[:, 1], y[:, 2]
 
-        do_mixup = np.random.rand() > 0.5
-        if do_mixup:
-            x, y0, y1, y2 = mixup_multi_targets(x, y0, y1, y2)
+        do_cutmix  = np.random.rand() < 0.5
+        if do_cutmix:
+            # x, y0, y1, y2 = mixup_multi_targets(x, y0, y1, y2)
+            x, y0, y1, y2 = cutmix_multi_targets(x, y0, y1, y2, alpha=1.)
         else:
             y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
 
@@ -196,7 +197,7 @@ class BengaliModule(pl.LightningModule):
         # (LBFGS it is automatically supported, no need for closure function)
         optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=0.001 * C.batch_size / 32)  # 0.001 for bs=32
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='min', factor=0.5, patience=3, min_lr=1e-10)
+            optimizer, mode='min', factor=0.5, patience=3, min_lr=1e-10, verbose=True)
         return [optimizer], [scheduler]
 
     @pl.data_loader

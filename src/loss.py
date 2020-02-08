@@ -9,7 +9,7 @@ https://arxiv.org/abs/1710.09412
 
 __author__ = 'Yuan Xu, Erdene-Ochir Tuguldur'
 
-__all__ = [ 'mixup_cross_entropy_loss', 'mixup', 'mixup_multi_targets', 'onehot']
+__all__ = [ 'mixup_cross_entropy_loss', 'mixup', 'mixup_multi_targets', 'cutmix_multi_targets', 'onehot']
 
 import numpy as np
 import torch
@@ -40,6 +40,49 @@ def onehot(targets, num_classes):
     """
     ###TEST### assert isinstance(targets, torch.LongTensor)
     return torch.zeros(targets.size()[0], num_classes).to(C.device).scatter_(1, targets.view(-1, 1), 1)
+
+def rand_bbox(size, lam):
+    W = size[2]
+    H = size[3]
+    cut_rat = np.sqrt(1. - lam)
+    cut_w = np.int(W * cut_rat)
+    cut_h = np.int(H * cut_rat)
+
+    # uniform
+    cx = np.random.randint(W)
+    cy = np.random.randint(H)
+
+    bbx1 = np.clip(cx - cut_w // 2, 0, W)
+    bby1 = np.clip(cy - cut_h // 2, 0, H)
+    bbx2 = np.clip(cx + cut_w // 2, 0, W)
+    bby2 = np.clip(cy + cut_h // 2, 0, H)
+
+    return bbx1, bby1, bbx2, bby2
+
+# https://www.kaggle.com/c/bengaliai-cv19/discussion/126504
+def cutmix_multi_targets(data, targets1, targets2, targets3, alpha):
+    targets1, targets2, targets3 = onehot(targets1, 168), onehot(targets2, 11), onehot(targets3, 7)
+
+    indices = torch.randperm(data.size(0))
+    shuffled_data = data[indices]
+    shuffled_targets1 = targets1[indices]
+    shuffled_targets2 = targets2[indices]
+    shuffled_targets3 = targets3[indices]
+
+    lam = np.random.beta(alpha, alpha)
+    bbx1, bby1, bbx2, bby2 = rand_bbox(data.size(), lam)
+
+    data[:, :, bbx1:bbx2, bby1:bby2] = data[indices, :, bbx1:bbx2, bby1:bby2]
+    # adjust lambda to exactly match pixel ratio
+    lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (data.size()[-1] * data.size()[-2]))
+
+    t1 = lam*targets1 + (1-lam)*shuffled_targets1
+    t2 = lam*targets2 + (1-lam)*shuffled_targets2
+    t3 = lam*targets3 + (1-lam)*shuffled_targets3
+    return data, t1, t2, t3
+    ## original code
+    #targets = [targets1, shuffled_targets1, targets2, shuffled_targets2, targets3, shuffled_targets3, lam]
+    #return data, targets
 
 ALPHA = 0.4  # fastai kernel
 def mixup_multi_targets(inputs, targets1, targets2, targets3, alpha=ALPHA):
