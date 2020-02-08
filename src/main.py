@@ -86,6 +86,8 @@ def accuracy(y, t):
     return acc.item(), pred_label.tolist()
     # return acc
 
+def softmax(x):
+    return np.exp(x) / np.sum(np.exp(x), axis=0)
 
 #####################################################################
 # --- Training Class ---
@@ -212,6 +214,17 @@ class BengaliModule(pl.LightningModule):
     #     # OPTIONAL
     #     return DataLoader(MNIST(os.getcwd(), train=False, download=True, transform=transforms.ToTensor()), batch_size=32)
 
+    def predict_proba(self, loader):
+        arr0, arr1, arr2 = [], [], []
+        for x in loader:
+            with torch.no_grad():
+                preds0, preds1, preds2 = self.forward(x.to(C.device))
+            arr0.append(np.apply_along_axis(softmax, -1, preds0.cpu().numpy()))
+            arr1.append(np.apply_along_axis(softmax, -1, preds1.cpu().numpy()))
+            arr2.append(np.apply_along_axis(softmax, -1, preds2.cpu().numpy()))
+        return np.concatenate(arr0), np.concatenate(arr1), np.concatenate(arr2)
+
+
 def train():
     m = BengaliModule()
     trainer = pl.Trainer(
@@ -234,10 +247,55 @@ def _load(checkpoint_path, map_location=None):
 
 def test():
     path = './lightning_logs/version_5/checkpoints/_ckpt_epoch_27.ckpt'
-    m = _load(path)
+    model = _load(path).to(device)
+    model.eval()
     
-    ret = m.forward(torch.Tensor(np.random.randn(3, 1, 128, 128)))
+    ret = model.forward(torch.Tensor(np.random.randn(3, 1, 128, 128)).to(device))
     print(ret[0].shape, ret[1].shape, ret[2].shape)
+    
+    preds0, preds1, preds2 = [], [], []
+    for i in range(4):  # 4 parque loop
+        indices = [i]
+        test_images = prepare_image(
+            C.datadir, C.featherdir, data_type='test', submission=True, indices=indices)
+        n_dataset = len(test_images)
+        print(f'i={i}, n_dataset={n_dataset}')
+        test_dataset = BengaliAIDataset(
+            test_images, None, 
+            transform=Transform(affine=False, crop=True, size=(C.image_size, C.image_size), train=False)
+        )
+
+        # INFER
+        ########################## TODO, CHANGE BACTHSIZE
+        test_loader = DataLoader(test_dataset, batch_size=2, shuffle=False)
+        p0arr, p1arr, p2arr = model.predict_proba(test_loader)
+        # print("p[012]arr", p0arr, p1arr, p2arr)
+        preds0.append(p0arr)
+        preds1.append(p1arr)
+        preds2.append(p2arr)
+
+        # CLEANUP
+        del test_loader
+        del test_dataset
+        del test_images
+        gc.collect()
+
+    preds0 = np.concatenate(preds0).argmax(axis=-1)
+    preds1 = np.concatenate(preds1).argmax(axis=-1)
+    preds2 = np.concatenate(preds2).argmax(axis=-1)
+    print('shapes:', 'p0', preds0.shape, 'p1', preds1.shape, 'p2', preds2.shape)
+
+    # SUBMISSION
+    row_id = []
+    target = []
+    for i in tqdm(range(len(preds0))):
+        row_id += [f'Test_{i}_grapheme_root', f'Test_{i}_vowel_diacritic',
+               f'Test_{i}_consonant_diacritic']
+        target += [preds0[i], preds1[i], preds2[i]]
+    submission_df = pd.DataFrame({'row_id': row_id, 'target': target})
+    submission_df.to_csv('submission.csv', index=False)
+
+
 
 if __name__ == "__main__":
     test()

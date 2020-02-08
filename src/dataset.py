@@ -94,7 +94,8 @@ class BengaliAIDataset(DatasetMixin):
     def __init__(self, images, labels=None, transform=None, indices=None):
         super(BengaliAIDataset, self).__init__(transform=transform)
         self.images = images
-        self.labels = labels.astype(np.int64)
+        if labels is not None:
+            self.labels = labels.astype(np.int64)
         if indices is None:
             indices = np.arange(len(images))
         self.indices = indices
