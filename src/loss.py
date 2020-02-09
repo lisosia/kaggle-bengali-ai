@@ -18,7 +18,19 @@ from torch.autograd import Variable
 import config
 C = config.get_config("./config/001_seresnext_mixup.yml")
 
-def mixup_cross_entropy_loss(input, target, size_average=True):
+# CLASS WEIGHT
+COUNT_GRAPHEME = [147, 145, 337, 318, 331, 175, 308, 153, 157, 444, 152, 151, 146, 5420, 796, 1083, 940, 761, 1633, 278, 336, 942, 2961, 5149, 336, 1127, 171, 305, 759, 2780, 437, 768, 1127, 136, 276, 476, 1024, 285, 3354, 617, 757, 305, 1957, 3630, 1057, 144, 580, 452, 1376, 321, 738, 326, 935, 3690, 592, 1680, 2688, 633, 1285, 2339, 426, 575, 868, 149, 5596, 1365, 786, 475, 631, 757, 957, 2936, 5736, 130, 1518, 1127, 1936, 957, 293, 3458, 456, 3438, 292, 1418, 460, 1363, 2094, 168, 760, 2313, 627, 1539, 1116, 622, 973, 727, 4926, 481, 627, 458, 448, 1083, 141, 3461, 160, 151, 751, 5321, 158, 908, 342, 787, 886, 4395, 150, 4015, 436, 1531, 1139, 1537, 1207, 462, 2313, 2073, 2188, 813, 159, 927, 952, 978, 144, 443, 1039, 4374, 623, 637, 1051, 562, 934, 2312, 883, 1746, 1067, 609, 612, 317, 302, 4392, 1723, 2402, 2311, 1248, 607, 1553, 732, 928, 790, 324, 143, 3281, 480, 311, 465, 165, 164, 1142, 307, 1585]
+COUNT_VOWEL = [41508, 36886, 25967, 16152, 18848, 5297, 4336, 28723, 3528, 16032, 3563]
+COUNT_CONSONANT = [125278, 7424, 23465, 619, 21270, 21397, 1387]
+def inverse_and_norm(arr):
+    inv = 1. / np.array(arr)
+    return inv / np.sum(inv) * len(arr)  # equal scale to [1,...,1]
+WEIGHT_GRAPHEME  = torch.Tensor(inverse_and_norm(COUNT_GRAPHEME).reshape(1, 168)).to(C.device)
+WEIGHT_VOWEL     = torch.Tensor(inverse_and_norm(COUNT_VOWEL).reshape(1, 11)).to(C.device)
+WEIGHT_CONSONANT = torch.Tensor(inverse_and_norm(COUNT_CONSONANT).reshape(1, 7)).to(C.device)
+CLASS_WEIGHTS = [WEIGHT_GRAPHEME, WEIGHT_VOWEL, WEIGHT_CONSONANT]
+
+def mixup_cross_entropy_loss(input, target, class_weight_dx, size_average=True):
     """Origin: https://github.com/moskomule/mixup.pytorch
     in PyTorch's cross entropy, targets are expected to be labels
     so to predict probabilities this loss is needed
@@ -29,7 +41,7 @@ def mixup_cross_entropy_loss(input, target, size_average=True):
     assert isinstance(input, Variable) and isinstance(target, Variable)
     input = torch.log(torch.nn.functional.softmax(input, dim=1).clamp(1e-5, 1))
     # input = input - torch.log(torch.sum(torch.exp(input), dim=1)).view(-1, 1)
-    loss = - torch.sum(input * target)
+    loss = - torch.sum(input * target * CLASS_WEIGHTS[class_weight_dx])
     return loss / input.size()[0] if size_average else loss
 
 def onehot(targets, num_classes):
