@@ -33,8 +33,6 @@ if True:
     
     train_parser.add_argument('--config', required=True)
     args = parser.parse_args()
-    print(args)
-    # C = config.get_config("./config/002_seresnext_mixup_adamw.yml")
     C = config.get_config(args.config)
 
 from dataset import *
@@ -52,7 +50,10 @@ def macro_recall(y_true, pred_y, n_grapheme=168, n_vowel=11, n_consonant=7):
     final_score = np.average(scores, weights=[2, 1, 1])
     # print(f'recall: grapheme {recall_grapheme}, vowel {recall_vowel}, consonant {recall_consonant}, '
     #       f'total {final_score}, y {y.shape}')
-    return final_score
+    return {'recall': final_score,
+            'recall_grapheme': recall_grapheme,
+            'recall_vowel': recall_vowel,
+            'recall_consonant': recall_consonant}
 
 
 def calc_macro_recall(solution, submission):
@@ -174,10 +175,9 @@ class BengaliModule(pl.LightningModule):
 
         y_true = [np.concatenate([x['y_true'][i] for x in outputs]) for i in range(3)]
         y_hat  = [np.concatenate([x['y_hat'][i]  for x in outputs]) for i in range(3)]
-        recall = macro_recall(y_true, y_hat)
-        tf_logs['recall'] = recall
-
-        return {'val_loss': tf_logs['loss/val_total_loss'], 'log': tf_logs}
+        recalls_dict = macro_recall(y_true, y_hat)
+        tf_logs = {**tf_logs, **recalls_dict}  # merge dicts
+        return {'val_loss': tf_logs['loss/val_total_loss'], 'log': tf_logs, 'progress_bar': tf_logs}
         
     # def test_step(self, batch, batch_idx):
     #     # OPTIONAL
@@ -230,7 +230,7 @@ def train(args):
     m = BengaliModule()
     trainer = pl.Trainer(
         early_stop_callback=None, max_epochs=C.n_epoch,
-        gpus=1, use_amp=False)
+        fast_dev_run=False)
     trainer.fit(m)
 
 
