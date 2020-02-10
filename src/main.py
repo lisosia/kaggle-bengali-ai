@@ -50,10 +50,10 @@ def macro_recall(y_true, pred_y, n_grapheme=168, n_vowel=11, n_consonant=7):
     final_score = np.average(scores, weights=[2, 1, 1])
     # print(f'recall: grapheme {recall_grapheme}, vowel {recall_vowel}, consonant {recall_consonant}, '
     #       f'total {final_score}, y {y.shape}')
-    return {'recall': final_score,
-            'recall_grapheme': recall_grapheme,
-            'recall_vowel': recall_vowel,
-            'recall_consonant': recall_consonant}
+    return {'recall/weight_mean': final_score,
+            'recall/recall_grapheme': recall_grapheme,
+            'recall/recall_vowel': recall_vowel,
+            'recall/recall_consonant': recall_consonant}
 
 
 def calc_macro_recall(solution, submission):
@@ -86,8 +86,9 @@ def softmax(x):
 #####################################################################
 class BengaliModule(pl.LightningModule):
 
-    def __init__(self):
+    def __init__(self, hparams):
         super(BengaliModule, self).__init__()
+        self.hparams = hparams
         self.device = torch.device(C.device)
 
         n_grapheme = 168
@@ -227,7 +228,7 @@ class BengaliModule(pl.LightningModule):
 
 
 def train(args):
-    m = BengaliModule()
+    m = BengaliModule(args)
     trainer = pl.Trainer(
         early_stop_callback=None, max_epochs=C.n_epoch,
         fast_dev_run=False)
