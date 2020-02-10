@@ -15,8 +15,10 @@ def _get_default_config():
     c.device='cuda:0' if torch.cuda.is_available() else 'cpu'
     c.out='.'
     c.image_size=128
+
     c.arch='pretrained'
     c.model_name='se_resnext50_32x4d'
+    c.use_class_weight = False
 
     c.datadir = Path('../input/bengaliai-cv19')
     c.featherdir = Path('../input/bengaliaicv19feather')

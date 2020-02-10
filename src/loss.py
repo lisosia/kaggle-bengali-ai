@@ -30,7 +30,7 @@ WEIGHT_VOWEL     = torch.Tensor(inverse_sqrt_and_norm(COUNT_VOWEL).reshape(1, 11
 WEIGHT_CONSONANT = torch.Tensor(inverse_sqrt_and_norm(COUNT_CONSONANT).reshape(1, 7)).to(C.device)
 CLASS_WEIGHTS = [WEIGHT_GRAPHEME, WEIGHT_VOWEL, WEIGHT_CONSONANT]
 
-def mixup_cross_entropy_loss(input, target, class_weight_dx, size_average=True):
+def mixup_cross_entropy_loss(input, target, class_dx, size_average=True):
     """Origin: https://github.com/moskomule/mixup.pytorch
     in PyTorch's cross entropy, targets are expected to be labels
     so to predict probabilities this loss is needed
@@ -40,8 +40,12 @@ def mixup_cross_entropy_loss(input, target, class_weight_dx, size_average=True):
     assert input.size() == target.size()
     assert isinstance(input, Variable) and isinstance(target, Variable)
     input = torch.log(torch.nn.functional.softmax(input, dim=1).clamp(1e-5, 1))
-    # input = input - torch.log(torch.sum(torch.exp(input), dim=1)).view(-1, 1)
-    loss = - torch.sum(input * target * CLASS_WEIGHTS[class_weight_dx])
+    if C.use_class_weight:
+        loss = - torch.sum(input * target * CLASS_WEIGHTS[class_dx])
+    else:
+        # input = input - torch.log(torch.sum(torch.exp(input), dim=1)).view(-1, 1)
+        loss = - torch.sum(input * target)
+
     return loss / input.size()[0] if size_average else loss
 
 def onehot(targets, num_classes):

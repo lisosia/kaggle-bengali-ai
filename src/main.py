@@ -110,9 +110,9 @@ class BengaliModule(pl.LightningModule):
     def _calc_loss_metric(preds, y0, y1, y2, log_prefix):
         """return loss(torch.Tensor) and log(not Tensor)"""
         # _loss_func = mixup_cross_entropy_loss if do_mixup else torch.nn.functional.cross_entropy
-        loss_grapheme = mixup_cross_entropy_loss(preds[0], y0, class_weight_dx=0)
-        loss_vowel = mixup_cross_entropy_loss(preds[1], y1, class_weight_dx=1)
-        loss_consonant = mixup_cross_entropy_loss(preds[2], y2, class_weight_dx=2)
+        loss_grapheme = mixup_cross_entropy_loss(preds[0], y0, class_dx=0)
+        loss_vowel = mixup_cross_entropy_loss(preds[1], y1, class_dx=1)
+        loss_consonant = mixup_cross_entropy_loss(preds[2], y2, class_dx=2)
         loss = loss_grapheme + loss_vowel + loss_consonant
 
         acc_grapheme, y_hat0 = accuracy(preds[0], y0)
