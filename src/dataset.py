@@ -228,21 +228,49 @@ def affine_image(img):
     assert transformed_image.ndim == 2
     return transformed_image
 
+def _bbox(img):
+    rows = np.any(img, axis=1)
+    cols = np.any(img, axis=0)
+    rmin, rmax = np.where(rows)[0][[0, -1]]
+    cmin, cmax = np.where(cols)[0][[0, -1]]
+    return rmin, rmax, cmin, cmax
 
-def crop_char_image(image, threshold=5./255.):
-    assert image.ndim == 2
-    is_black = image > threshold
+# def crop_char_image2(img0, size=SIZE, pad=16):
+def crop_char_image2(img0, pad=16):
+    HEIGHT = 137
+    WIDTH = 236
 
-    is_black_vertical = np.sum(is_black, axis=0) > 0
-    is_black_horizontal = np.sum(is_black, axis=1) > 0
-    left = np.argmax(is_black_horizontal)
-    right = np.argmax(is_black_horizontal[::-1])
-    top = np.argmax(is_black_vertical)
-    bottom = np.argmax(is_black_vertical[::-1])
-    height, width = image.shape
-    cropped_image = image[left:height - right, top:width - bottom]
-    return cropped_image
+    #crop a box around pixels large than the threshold 
+    #some images contain line at the sides
+    ymin,ymax,xmin,xmax = _bbox(img0[5:-5,5:-5] > 80 / 255.)
+    #cropping may cut too much, so we need to add it back
+    xmin = xmin - 13 if (xmin > 13) else 0
+    ymin = ymin - 10 if (ymin > 10) else 0
+    xmax = xmax + 13 if (xmax < WIDTH - 13) else WIDTH
+    ymax = ymax + 10 if (ymax < HEIGHT - 10) else HEIGHT
+    img = img0[ymin:ymax,xmin:xmax]
+    #remove lo intensity pixels as noise
+    img[img < (28 / 255.)] = 0
+    lx, ly = xmax-xmin,ymax-ymin
+    l = max(lx,ly) + pad
+    #make sure that the aspect ratio is kept in rescaling
+    img = np.pad(img, [((l-ly)//2,), ((l-lx)//2,)], mode='constant')
+    return img
+    # return cv2.resize(img,(size,size))
 
+#def crop_char_image(image, threshold=5./255.):
+#    assert image.ndim == 2
+#    is_black = image > threshold
+#
+#    is_black_vertical = np.sum(is_black, axis=0) > 0
+#    is_black_horizontal = np.sum(is_black, axis=1) > 0
+#    left = np.argmax(is_black_horizontal)
+#    right = np.argmax(is_black_horizontal[::-1])
+#    top = np.argmax(is_black_vertical)
+#    bottom = np.argmax(is_black_vertical[::-1])
+#    height, width = image.shape
+#    cropped_image = image[left:height - right, top:width - bottom]
+#    return cropped_image
 
 def resize(image, size=(128, 128)):
     return cv2.resize(image, size)
@@ -269,13 +297,12 @@ def apply_aug(aug, image):
 
 
 class Transform:
-    def __init__(self, affine=True, crop=True, size=(64, 64),
-                 normalize=True, train=True, threshold=40.,
+    def __init__(self, affine=True, size=(64, 64),
+                 normalize=False, train=True, threshold=40.,
                  sigma=-1., blur_ratio=0., noise_ratio=0., cutout_ratio=0.,
                  grid_distortion_ratio=0., elastic_distortion_ratio=0., random_brightness_ratio=0.,
                  piece_affine_ratio=0., ssr_ratio=0.):
         self.affine = affine
-        self.crop = crop
         self.size = size
         self.normalize = normalize
         self.train = train
@@ -296,15 +323,23 @@ class Transform:
             x, y = example
         else:
             x = example
-        # --- Augmentation ---
-        if self.affine:
-            x = affine_image(x)
 
         # --- Train/Test common preprocessing ---
-        if self.crop:
-            x = crop_char_image(x, threshold=self.threshold)
+        x = crop_char_image2(x / x.max())
+
+        # --- Augmentation ---
+        if self.affine:
+            x = apply_aug(A.ShiftScaleRotate(
+                    shift_limit=4./255., scale_limit=(-0.15, 0.2), rotate_limit=7,
+                    border_mode=cv2.BORDER_CONSTANT, value=0., p=1.0),
+                    x)
+            ## comment out. should rotate around center
+            #    x = affine_image(x)
+
+        # --- Train/Test common preprocessing ---
         if self.size is not None:
             x = resize(x, size=self.size)
+
         if self.sigma > 0.:
             x = add_gaussian_noise(x, sigma=self.sigma)
 
@@ -370,15 +405,6 @@ class Transform:
             return x
 
 
-def get_train_dataset_justfortest():
-    train_transform = Transform(
-        size=(image_size, image_size), threshold=20.,
-        sigma=-1., blur_ratio=0.2, noise_ratio=0.2, cutout_ratio=0.2,
-        grid_distortion_ratio=0.2, random_brightness_ratio=0.2,
-        piece_affine_ratio=0.2, ssr_ratio=0.2)
-    return BengaliAIDataset(train_images, train_labels,
-                                 transform=train_transform)
-
 # load data
 train = pd.read_csv(C.datadir/'train.csv')
 train_labels = train[['grapheme_root', 'vowel_diacritic', 'consonant_diacritic']].values
@@ -403,7 +429,7 @@ def get_trainval_dataset():
         indices=_fold_train)
     valid_dataset = BengaliAIDataset(
         train_images, train_labels,
-        transform=Transform(affine=False, crop=True, size=(C.image_size, C.image_size)),
+        transform=Transform(affine=False, size=(C.image_size, C.image_size)),
         indices=_fold_valid)
 
     print('train_dataset', len(train_dataset), 'valid_dataset', len(valid_dataset))
@@ -430,19 +456,10 @@ def get_trainval_dataset_png():
         transform=Transform(size=(C.image_size, C.image_size)))
     valid_dataset = BengaliAIDatasetPNG(
         x_valid, y_valid, 
-        transform=Transform(affine=False, crop=True, size=(C.image_size, C.image_size)))
+        transform=Transform(affine=False, size=(C.image_size, C.image_size)))
     print('train_dataset', len(train_dataset), 'valid_dataset', len(valid_dataset))
 
     return train_dataset, valid_dataset
-
-########## COPYED FROM PREDICTION KERNEL #############
-# note. treth is 20, image_size is 128 for all 4 provided models
-## transform_test = Transform(affine=False, crop=True, size=(image_size, image_size), threshold, train=False)
-transform_test = Transform(affine=False, crop=True, size=(C.image_size, C.image_size), threshold=20, train=False)
-########## COPYED FROM PREDICTION KERNEL #############
-
-#def get_test_dataset(idx):
-#    """idx must be one of [1, 2, 3, 4]"""
 
 
 if __name__ == "__main__":
