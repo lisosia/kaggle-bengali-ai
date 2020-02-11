@@ -9,7 +9,7 @@ from collections import Counter
 from bisect import bisect_right
 
 from torch.optim.optimizer import Optimizer
-from torch.optim.lr_scheduler import _LRScheduler
+# from torch.optim.lr_scheduler import _LRScheduler
 
 class _LRScheduler(object):
 
