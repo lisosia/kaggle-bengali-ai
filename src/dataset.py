@@ -391,20 +391,20 @@ def get_trainval_dataset():
         C.datadir, C.featherdir, data_type='train', submission=False, indices=indices)
     print(f'data load time was {time.time() - _time_start}')
 
-    n_dataset = len(train_images)
-    train_data_size = int(n_dataset * 0.9)
-    valid_data_size = int(n_dataset - train_data_size)
-
-    perm = np.random.RandomState(777).permutation(n_dataset)
-    print('perm', perm)
+    _df_fold = pd.read_csv('../input/fold_trainval.csv')
+    _fold_train = np.where(_df_fold.fold.values == 'train')[0]
+    _fold_valid = np.where(_df_fold.fold.values == 'valid')[0]
+    assert _fold_train.size + _fold_valid.size == len(train_images)
+    print(f'pre-split fold loaded, valid_indices:{_fold_valid}')
+    
     train_dataset = BengaliAIDataset(
         train_images, train_labels,
         transform=Transform(size=(C.image_size, C.image_size)),
-        indices=perm[:train_data_size])
+        indices=_fold_train)
     valid_dataset = BengaliAIDataset(
         train_images, train_labels,
         transform=Transform(affine=False, crop=True, size=(C.image_size, C.image_size)),
-        indices=perm[train_data_size:train_data_size+valid_data_size])
+        indices=_fold_valid)
 
     print('train_dataset', len(train_dataset), 'valid_dataset', len(valid_dataset))
     return train_dataset, valid_dataset
@@ -413,11 +413,17 @@ from sklearn.model_selection import train_test_split
 def get_trainval_dataset_png():
     print(train.image_id.values.shape)
     print(train_labels.shape)
-    x_train, x_valid, y_train, y_valid = train_test_split(
-        train.image_id.values,
-        train_labels,
-        train_size = 0.9
-    )
+    
+    _df_fold = pd.read_csv('../input/fold_trainval.csv')
+    _fold_train = np.where(_df_fold.fold.values == 'train')
+    _fold_valid = np.where(_df_fold.fold.values == 'valid')
+    assert _fold_train[0].size + _fold_valid[0].size == len(train.image_id.values)
+    print(f'pre-split fold loaded, valid_indices:{_fold_valid}')
+
+    x_train = train.image_id.values[_fold_train]
+    y_train = train_labels[_fold_train]
+    x_valid = train.image_id.values[_fold_valid]
+    y_valid = train_labels[_fold_valid]
     
     train_dataset = BengaliAIDatasetPNG(
         x_train, y_train, 
