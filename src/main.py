@@ -37,6 +37,7 @@ if True:
 
 from dataset import *
 from model import *
+from myoptim import OneCycleLR
 
 # --- setup ---
 pd.set_option('max_columns', 50)
@@ -178,6 +179,9 @@ class BengaliModule(pl.LightningModule):
         y_hat  = [np.concatenate([x['y_hat'][i]  for x in outputs]) for i in range(3)]
         recalls_dict = macro_recall(y_true, y_hat)
         tf_logs = {**tf_logs, **recalls_dict}  # merge dicts
+        tf_logs['lr'] = self.trainer.lr_schedulers[0].get_lr()
+        print("lr:", tf_logs['lr'])
+
         return {'val_loss': tf_logs['loss/val_total_loss'], 'log': tf_logs, 'progress_bar': tf_logs}
         
     # def test_step(self, batch, batch_idx):
@@ -196,9 +200,21 @@ class BengaliModule(pl.LightningModule):
         # REQUIRED
         # can return multiple optimizers and learning_rate schedulers
         # (LBFGS it is automatically supported, no need for closure function)
-        optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=0.001 * C.batch_size / 32)  # 0.001 for bs=32
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='min', factor=0.5, patience=3, min_lr=1e-10, verbose=True)
+        if C.scheduler == 'OneCycleLR':
+            MAX_LR = 5e-4 * 25
+            MIN_LR = 5e-4
+            TOTAL_STEPS = C.n_epoch
+            print(f'TOTAL_STEPS : {TOTAL_STEPS}')
+            optimizer =  torch.optim.AdamW(self.classifier.parameters(), lr=MIN_LR, weight_decay=1.25e-4)
+            scheduler = OneCycleLR(
+                optimizer, num_steps=TOTAL_STEPS, lr_range=(MIN_LR, MAX_LR))
+        elif C.scheduler == 'Adam':
+            optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=0.001 * C.batch_size / 32)  # 0.001 for bs=32
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer, mode='min', factor=0.5, patience=3, min_lr=1e-10, verbose=True)
+        else:
+            raise "unknown optim"
+            
         return [optimizer], [scheduler]
 
     @pl.data_loader
