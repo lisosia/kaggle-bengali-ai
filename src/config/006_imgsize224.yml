@@ -1,0 +1,3 @@
+n_epoch: 50
+image_size: 224
+batch_size: 64
