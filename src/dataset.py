@@ -325,7 +325,7 @@ class Transform:
             x = example
 
         # --- Train/Test common preprocessing ---
-        x = crop_char_image2(x / x.max())
+        x = crop_char_image2(x / x.max(), pad=C.crop_pad_size)
 
         # --- Augmentation ---
         if self.affine:

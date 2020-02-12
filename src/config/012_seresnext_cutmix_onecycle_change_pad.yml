@@ -1,0 +1,5 @@
+n_epoch: 70
+scheduler: 'OneCycleLR'
+
+# previous values was 16
+crop_pad_size: 0
