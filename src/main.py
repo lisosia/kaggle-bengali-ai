@@ -21,6 +21,8 @@ from sklearn.model_selection import KFold
 import torch
 from torch.utils.data.dataloader import DataLoader
 import pytorch_lightning as pl
+from pytorch_lightning.callbacks import ModelCheckpoint
+
 
 # --- import local modules ---
 import config
@@ -116,7 +118,7 @@ class BengaliModule(pl.LightningModule):
         loss_grapheme = mixup_cross_entropy_loss(preds[0], y0, class_dx=0)
         loss_vowel = mixup_cross_entropy_loss(preds[1], y1, class_dx=1)
         loss_consonant = mixup_cross_entropy_loss(preds[2], y2, class_dx=2)
-        loss = loss_grapheme + loss_vowel + loss_consonant
+        loss = 3*0.5* loss_grapheme + 3*0.25* loss_vowel + 3*0.25* loss_consonant  # back compati
 
         acc_grapheme, y_hat0 = accuracy(preds[0], y0)
         acc_vowel, y_hat1 = accuracy(preds[1], y1)
@@ -143,7 +145,8 @@ class BengaliModule(pl.LightningModule):
             # x, y0, y1, y2 = mixup_multi_targets(x, y0, y1, y2)
             x, y0, y1, y2 = cutmix_multi_targets(x, y0, y1, y2, alpha=1.)
         else:
-            y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
+            x, y0, y1, y2 = mixup_multi_targets(x, y0, y1, y2)
+            # y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
 
         preds = self.forward(x)
         loss, logs, _ = self._calc_loss_metric(preds, y0, y1, y2, log_prefix='train')
@@ -179,7 +182,8 @@ class BengaliModule(pl.LightningModule):
         y_hat  = [np.concatenate([x['y_hat'][i]  for x in outputs]) for i in range(3)]
         recalls_dict = macro_recall(y_true, y_hat)
         tf_logs = {**tf_logs, **recalls_dict}  # merge dicts
-        tf_logs['lr'] = self.trainer.lr_schedulers[0].get_lr()
+        tf_logs['lr'] = self.trainer.lr_schedulers[0].get_lr()[0]
+        print(tf_logs)
         print("lr:", tf_logs['lr'])
 
         return {'val_loss': tf_logs['loss/val_total_loss'], 'log': tf_logs, 'progress_bar': tf_logs}
@@ -212,6 +216,11 @@ class BengaliModule(pl.LightningModule):
             optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=0.001 * C.batch_size / 32)  # 0.001 for bs=32
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 optimizer, mode='min', factor=0.5, patience=3, min_lr=1e-10, verbose=True)
+        elif C.scheduler == 'Cosine':
+            # https://www.kaggle.com/c/bengaliai-cv19/discussion/123198#719043
+            optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=0.001 * C.batch_size / 32)  # 0.001 for bs=32
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, C.n_epoch)
         else:
             raise "unknown optim"
             
@@ -245,8 +254,17 @@ class BengaliModule(pl.LightningModule):
 
 def train(args):
     m = BengaliModule(args)
+    checkpoint_callback = ModelCheckpoint(
+    filepath=os.getcwd(),
+    save_top_k=3,
+    verbose=True,
+    monitor='recall/weight_mean',
+    mode='max',
+    prefix=''
+    )
     trainer = pl.Trainer(
         early_stop_callback=None, max_epochs=C.n_epoch,
+        checkpoint_callback=checkpoint_callback,
         fast_dev_run=False)
     trainer.fit(m)
 
@@ -281,12 +299,12 @@ def test():
         print(f'i={i}, n_dataset={n_dataset}')
         test_dataset = BengaliAIDataset(
             test_images, None, 
-            transform=Transform(affine=False, crop=True, size=(C.image_size, C.image_size), train=False)
+            transform=Transform(affine=False, size=(C.image_size, C.image_size), train=False)
         )
 
         # INFER
         ########################## TODO, CHANGE BACTHSIZE
-        test_loader = DataLoader(test_dataset, batch_size=2, shuffle=False)
+        test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)
         p0arr, p1arr, p2arr = model.predict_proba(test_loader)
         # print("p[012]arr", p0arr, p1arr, p2arr)
         preds0.append(p0arr)

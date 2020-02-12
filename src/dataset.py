@@ -272,8 +272,8 @@ def crop_char_image2(img0, pad=16):
 #    cropped_image = image[left:height - right, top:width - bottom]
 #    return cropped_image
 
-def resize(image, size=(128, 128)):
-    return cv2.resize(image, size)
+def resize(image, size=(128, 128)):  # size is (H,W)
+    return cv2.resize(image, (size[1], size[0]))
 
 ### [Update] I added albumentations augmentations introduced in Bengali: albumentations data augmentation tutorial.
 import albumentations as A
@@ -330,7 +330,7 @@ class Transform:
         # --- Augmentation ---
         if self.affine:
             x = apply_aug(A.ShiftScaleRotate(
-                    shift_limit=4./255., scale_limit=(-0.15, 0.2), rotate_limit=7,
+                    shift_limit=(4./C.image_size[0]), scale_limit=tuple(C.aug_scale), rotate_limit=7,
                     border_mode=cv2.BORDER_CONSTANT, value=0., p=1.0),
                     x)
             ## comment out. should rotate around center
@@ -338,7 +338,7 @@ class Transform:
 
         # --- Train/Test common preprocessing ---
         if self.size is not None:
-            x = resize(x, size=self.size)
+            x = resize(x, size=self.size)  # H, W
 
         if self.sigma > 0.:
             x = add_gaussian_noise(x, sigma=self.sigma)
@@ -425,11 +425,11 @@ def get_trainval_dataset():
     
     train_dataset = BengaliAIDataset(
         train_images, train_labels,
-        transform=Transform(size=(C.image_size, C.image_size)),
+        transform=Transform(size=C.image_size),
         indices=_fold_train)
     valid_dataset = BengaliAIDataset(
         train_images, train_labels,
-        transform=Transform(affine=False, size=(C.image_size, C.image_size)),
+        transform=Transform(affine=False, size=C.image_size),
         indices=_fold_valid)
 
     print('train_dataset', len(train_dataset), 'valid_dataset', len(valid_dataset))
@@ -453,10 +453,10 @@ def get_trainval_dataset_png():
     
     train_dataset = BengaliAIDatasetPNG(
         x_train, y_train, 
-        transform=Transform(size=(C.image_size, C.image_size)))
+        transform=Transform(size=C.image_size))
     valid_dataset = BengaliAIDatasetPNG(
         x_valid, y_valid, 
-        transform=Transform(affine=False, size=(C.image_size, C.image_size)))
+        transform=Transform(affine=False, size=C.image_size))
     print('train_dataset', len(train_dataset), 'valid_dataset', len(valid_dataset))
 
     return train_dataset, valid_dataset

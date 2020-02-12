@@ -14,7 +14,7 @@ def _get_default_config():
     c.batch_size=128
     c.device='cuda:0' if torch.cuda.is_available() else 'cpu'
     c.out='.'
-    c.image_size=128
+    c.image_size=[128, 128] #  H,W
 
     c.arch='pretrained'
     c.model_name='se_resnext50_32x4d'
