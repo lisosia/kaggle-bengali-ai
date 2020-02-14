@@ -139,7 +139,46 @@ class LinearBlock(nn.Module):
             h = self.dropout(h)
         return h
 
+# https://github.com/lessw2020/mish/blob/master/mish.py
+class Mish(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        #inlining this saves 1 second per epoch (V100 GPU) vs having a temp x and then returning x(!)
+        return x *( torch.tanh(F.softplus(x)))
+
+from torch.nn.parameter import Parameter
+def _gem(x, p=3, eps=1e-6):
+    return F.avg_pool2d(x.clamp(min=eps).pow(p), (x.size(-2), x.size(-1))).pow(1./p)
+
+class GeM(nn.Module):
+    def __init__(self, p=3, eps=1e-6):
+        super(GeM,self).__init__()
+        self.p = Parameter(torch.ones(1)*p)
+        self.eps = eps
+    def forward(self, x):
+        return _gem(x, p=self.p, eps=self.eps)
+    def __repr__(self):
+        return self.__class__.__name__ + '(' + 'p=' + '{:.4f}'.format(self.p.data.tolist()[0]) + ', ' + 'eps=' + str(self.eps) + ')'
+
+class Flatten(nn.Module):
+    def forward(self, input):
+        return input.view(input.size(0), -1)
+
 class PretrainedCNN(nn.Module):
+
+    def class_head(self, out_c):
+        return Sequential(
+                Mish(),
+                nn.Conv2d(2048, 512, kernel_size=3, stride=1, padding=1, bias=True),
+                nn.BatchNorm2d(512),
+                GeM(),
+                # nn.AdaptiveAvgPool2d(1),
+                Flatten(),
+                nn.Linear(512, out_c)
+                )
+
     def __init__(self, model_name='se_resnext101_32x4d',
                  in_channels=1, out_dim=10, use_bn=True,
                  pretrained='imagenet'):
@@ -148,29 +187,28 @@ class PretrainedCNN(nn.Module):
             in_channels, 3, kernel_size=3, stride=1, padding=1, bias=True)
         self.base_model = pretrainedmodels.__dict__[model_name](pretrained=pretrained)
         activation = F.leaky_relu
-        self.do_pooling = True
-        if self.do_pooling:
-            inch = self.base_model.last_linear.in_features
-        else:
-            inch = None
+        inch = self.base_model.last_linear.in_features
+
         hdim = 512
-        lin1 = LinearBlock(inch, hdim, use_bn=use_bn, activation=activation, residual=False)
-        lin2 = LinearBlock(hdim, out_dim, use_bn=use_bn, activation=None, residual=False)
-        self.lin_layers = Sequential(lin1, lin2)
+        #lin1 = LinearBlock(inch, hdim, use_bn=use_bn, activation=activation, residual=False)
+        #lin2 = LinearBlock(hdim, out_dim, use_bn=use_bn, activation=None, residual=False)
+        #self.lin_layers = Sequential(lin1, lin2)
+        self.tail1 = self.class_head(168)
+        self.tail2 = self.class_head(11)
+        self.tail3 = self.class_head(7)
 
     def forward(self, x):
         h = self.conv0(x)
         h = self.base_model.features(h)
-
-        if self.do_pooling:
-            h = torch.sum(h, dim=(-1, -2))
-        else:
-            # [128, 2048, 4, 4] when input is (128, 128)
-            bs, ch, height, width = h.shape
-            h = h.view(bs, ch*height*width)
-        for layer in self.lin_layers:
-            h = layer(h)
-        return h
+        
+        out1 = self.tail1(h)
+        out2 = self.tail2(h)
+        out3 = self.tail3(h)
+        return out1, out2, out3
+        #h = torch.sum(h, dim=(-1, -2))
+        #for layer in self.lin_layers:
+        #    h = layer(h)
+        #return h
 
 
 ### Classifer

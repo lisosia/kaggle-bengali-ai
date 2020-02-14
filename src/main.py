@@ -220,7 +220,8 @@ class BengaliModule(pl.LightningModule):
             scheduler = OneCycleLR(
                 optimizer, num_steps=TOTAL_STEPS, lr_range=(MIN_LR, MAX_LR))
         elif C.scheduler == 'Adam':
-            optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=0.001 * C.batch_size / 32)  # 0.001 for bs=32
+            # optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=0.001 * C.batch_size / 32)  # 0.001 for bs=32
+            optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=1e-5 * C.batch_size)
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 optimizer, mode='min', factor=0.5, patience=3, min_lr=1e-10, verbose=True)
         elif C.scheduler == 'Cosine':
