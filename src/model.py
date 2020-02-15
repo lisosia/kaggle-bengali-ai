@@ -183,14 +183,14 @@ class PretrainedCNN(nn.Module):
                 GeM(),
                 # nn.AdaptiveAvgPool2d(1),
                 Flatten(),
-                nn.Linear(512, out_c)
+                nn.Linear(512, out_c),
                 )
 
     def __init__(self, model_name='se_resnext101_32x4d',
                  in_channels=1, out_dim=10, use_bn=True,
                  pretrained='imagenet'):
         super(PretrainedCNN, self).__init__()
-        if False:
+        if True:
             self.conv0 = nn.Conv2d(
                 in_channels, 3, kernel_size=3, stride=1, padding=1, bias=True)
         else:
@@ -208,12 +208,12 @@ class PretrainedCNN(nn.Module):
         self.tail3 = self.class_head(7)
 
     def forward(self, x):
-        if False:
+        if True:
             h = self.conv0(x)
         else:
             h = torch.cat([x, self.mesh.expand(x.size()[0], 2, C.image_size[0], C.image_size[1])], 1)
-        h = self.base_model.features(h)
-        
+        h = self.base_model.features(h)  # B,2048,2,2 for 64x64input
+
         out1 = self.tail1(h)
         out2 = self.tail2(h)
         out3 = self.tail3(h)
