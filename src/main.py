@@ -175,22 +175,24 @@ class BengaliModule(pl.LightningModule):
         tf_logs = {}
         for key in keys:
             tf_logs[key] = np.stack([x['_val_log'][key] for x in outputs]).mean()
-        ### print( len ( self.trainer.lr_schedulers ))
-        ### tf_logs['lr'] = self.trainer.lr_schedulers[0].optimizer.param_groups[0]['lr']
 
         y_true = [np.concatenate([x['y_true'][i] for x in outputs]) for i in range(3)]
         y_hat  = [np.concatenate([x['y_hat'][i]  for x in outputs]) for i in range(3)]
         recalls_dict = macro_recall(y_true, y_hat)
         tf_logs = {**tf_logs, **recalls_dict}  # merge dicts
-        # tf_logs['lr'] = self.trainer.lr_schedulers[0].get_lr()
-        #tf_logs['lr'] = self.trainer.reduce_lr_on_plateau_scheduler.get_last_lr()
+
         for param_group in self.trainer.optimizers[0].param_groups:
             lr = param_group['lr']
             break
         tf_logs['lr'] = lr
         
+        for k, v in tf_logs.items():
+            if k == 'lr':
+                print('{}:{:.5e}   '.format(k, v), end='')
+            else:
+                print('{}:{:.5f}   '.format(k, v), end='')
+        print('')
 
-        print(tf_logs)
         return {'val_loss': 1 - tf_logs['recall/recall_grapheme'], 'log': tf_logs}
         # return {'val_loss': tf_logs['loss/val_total_loss'], 'log': tf_logs}
         # return {'val_loss': tf_logs['loss/val_total_loss'], 'log': tf_logs, 'progress_bar': tf_logs}
