@@ -330,7 +330,7 @@ class Transform:
         # --- Augmentation ---
         if self.affine:
             x = apply_aug(A.ShiftScaleRotate(
-                    shift_limit=(4./C.image_size[0]), scale_limit=tuple(C.aug_scale), rotate_limit=7,
+                    shift_limit=(4./C.image_size[0]), scale_limit=tuple(C.aug_scale), rotate_limit=C.aug_rot,
                     border_mode=cv2.BORDER_CONSTANT, value=0., p=1.0),
                     x)
             ## comment out. should rotate around center
