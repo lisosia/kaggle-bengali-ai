@@ -417,11 +417,11 @@ def get_trainval_dataset():
         C.datadir, C.featherdir, data_type='train', submission=False, indices=indices)
     print(f'data load time was {time.time() - _time_start}')
 
-    _df_fold = pd.read_csv('../input/fold_trainval.csv')
-    _fold_train = np.where(_df_fold.fold.values == 'train')[0]
-    _fold_valid = np.where(_df_fold.fold.values == 'valid')[0]
-    assert _fold_train.size + _fold_valid.size == len(train_images)
+    _df_fold = pd.read_csv('../input/train_with_fold.csv')
+    _fold_train = np.where(_df_fold.fold.values != str(C.fold))
+    _fold_valid = np.where(_df_fold.fold.values == str(C.fold))
     print(f'pre-split fold loaded, valid_indices:{_fold_valid}')
+    assert _fold_train.size + _fold_valid.size == len(train_images)
     
     train_dataset = BengaliAIDataset(
         train_images, train_labels,
@@ -440,11 +440,12 @@ def get_trainval_dataset_png():
     print(train.image_id.values.shape)
     print(train_labels.shape)
     
-    _df_fold = pd.read_csv('../input/fold_trainval.csv')
-    _fold_train = np.where(_df_fold.fold.values == 'train')
-    _fold_valid = np.where(_df_fold.fold.values == 'valid')
-    assert _fold_train[0].size + _fold_valid[0].size == len(train.image_id.values)
+    _df_fold = pd.read_csv('../input/train_with_fold.csv')
+    print(_df_fold.head())
+    _fold_train = np.where(_df_fold.fold.values != C.fold)
+    _fold_valid = np.where(_df_fold.fold.values == C.fold)
     print(f'pre-split fold loaded, valid_indices:{_fold_valid}')
+    assert _fold_train[0].size + _fold_valid[0].size == len(train.image_id.values)
 
     x_train = train.image_id.values[_fold_train]
     y_train = train_labels[_fold_train]
