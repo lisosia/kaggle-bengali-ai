@@ -15,6 +15,8 @@ from tqdm import tqdm
 import pretrainedmodels
 
 from loss import *
+import config
+C = config.get_config()
 
 def residual_add(lhs, rhs):
     lhs_ch, rhs_ch = lhs.shape[1], rhs.shape[1]
@@ -166,6 +168,11 @@ class Flatten(nn.Module):
     def forward(self, input):
         return input.view(input.size(0), -1)
 
+def _make_mesh(bs, h, w):
+    w_info, h_info = np.meshgrid(np.linspace(-0.5, 0.5, w), np.linspace(-0.5, 0.5, h))
+    info = np.stack([w_info, h_info], axis=0)
+    return torch.Tensor(info)
+
 class PretrainedCNN(nn.Module):
 
     def class_head(self, out_c):
@@ -183,8 +190,11 @@ class PretrainedCNN(nn.Module):
                  in_channels=1, out_dim=10, use_bn=True,
                  pretrained='imagenet'):
         super(PretrainedCNN, self).__init__()
-        self.conv0 = nn.Conv2d(
-            in_channels, 3, kernel_size=3, stride=1, padding=1, bias=True)
+        if False:
+            self.conv0 = nn.Conv2d(
+                in_channels, 3, kernel_size=3, stride=1, padding=1, bias=True)
+        else:
+            self.mesh = _make_mesh(C.batch_size, C.image_size[0], C.image_size[1]).to(C.device)
         self.base_model = pretrainedmodels.__dict__[model_name](pretrained=pretrained)
         activation = F.leaky_relu
         inch = self.base_model.last_linear.in_features
@@ -198,7 +208,10 @@ class PretrainedCNN(nn.Module):
         self.tail3 = self.class_head(7)
 
     def forward(self, x):
-        h = self.conv0(x)
+        if False:
+            h = self.conv0(x)
+        else:
+            h = torch.cat([x, self.mesh.expand(x.size()[0], 2, C.image_size[0], C.image_size[1])], 1)
         h = self.base_model.features(h)
         
         out1 = self.tail1(h)
