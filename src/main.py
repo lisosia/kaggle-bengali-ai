@@ -40,6 +40,7 @@ if True:
 from dataset import *
 from model import *
 from myoptim import OneCycleLR
+from trans import *
 
 # --- setup ---
 pd.set_option('max_columns', 50)
@@ -108,6 +109,10 @@ class BengaliModule(pl.LightningModule):
         # load data after model is in cuda
         self.train_dataset, self.valid_dataset = get_trainval_dataset_png()
 
+        self.GM_PROB = None
+        self.trans_gridmask = GridMask(
+            C.image_size[0] * 0.1, C.image_size[0] * 0.4, ratio=0.6, rotate=360, mode=1).to(C.device)
+
     def forward(self, x):
         return self.classifier(x.to(self.device))  # todo return [logi1, logi2, logi3]
 
@@ -135,18 +140,30 @@ class BengaliModule(pl.LightningModule):
         return loss, logs, [y_hat0, y_hat1, y_hat2]
 
     def training_step(self, batch, batch_idx):
-        # REQUIRED
         x, y = batch
-        x, y = x.to(self.device), y.to(self.device)
+
+        x = x.to(self.device)
+        y = y.to(self.device)
+
         y0, y1, y2 = y[:, 0], y[:, 1], y[:, 2]
 
-        do_cutmix  = np.random.rand() < 0.5
-        if do_cutmix:
-            # x, y0, y1, y2 = mixup_multi_targets(x, y0, y1, y2)
-            x, y0, y1, y2 = cutmix_multi_targets(x, y0, y1, y2, alpha=1.)
-        else:
-            x, y0, y1, y2 = mixup_multi_targets(x, y0, y1, y2)
-            # y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
+        _p = np.random.rand() < 0.5
+        #if _p < C.aug_cutmix_p:
+        #    x, y0, y1, y2 = cutmix_multi_targets(x, y0, y1, y2, alpha=1.)
+        #elif _p < C.aug_cutmix_p + C._aug_mixup_p:
+        #    x, y0, y1, y2 = mixup_multi_targets(x, y0, y1, y2)
+        #else
+        #    y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
+
+        ### GridMask ###
+        y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
+        cur_epo = self.trainer.current_epoch
+        GM_MAX_PROB = 0.8  # from paper
+        GM_SATURATE_EPO = 0.1  # 0.8 by paper
+        self.GM_PROB = GM_MAX_PROB * min(1, cur_epo / (C.n_epoch * GM_SATURATE_EPO))
+        if _p < self.GM_PROB:
+            x = self.trans_gridmask(x).to(C.device)
+        ### GridMask ###
 
         preds = self.forward(x)
         loss, logs, _ = self._calc_loss_metric(preds, y0, y1, y2, log_prefix='train')
@@ -170,6 +187,7 @@ class BengaliModule(pl.LightningModule):
                }
 
     def validation_end(self, outputs):
+        print("debug: gradmask prob: ", self.GM_PROB)
         # OPTIONAL
         keys = outputs[0]['_val_log'].keys()
         tf_logs = {}
@@ -225,7 +243,7 @@ class BengaliModule(pl.LightningModule):
             # optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=0.001 * C.batch_size / 32)  # 0.001 for bs=32
             optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=C.lr * C.batch_size)
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer, mode='min', factor=0.5, patience=3, min_lr=1e-10, verbose=True)
+                optimizer, mode='min', factor=0.5, patience=5, min_lr=C.lr*C.batch_size/32., verbose=True)
         elif C.scheduler == 'Cosine':
             # https://www.kaggle.com/c/bengaliai-cv19/discussion/123198#719043
             optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=C.lr * C.batch_size)  # 0.001 for bs=32
