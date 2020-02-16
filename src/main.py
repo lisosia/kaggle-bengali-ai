@@ -147,22 +147,22 @@ class BengaliModule(pl.LightningModule):
 
         y0, y1, y2 = y[:, 0], y[:, 1], y[:, 2]
 
-        _p = np.random.rand() < 0.5
-        #if _p < C.aug_cutmix_p:
-        #    x, y0, y1, y2 = cutmix_multi_targets(x, y0, y1, y2, alpha=1.)
-        #elif _p < C.aug_cutmix_p + C._aug_mixup_p:
-        #    x, y0, y1, y2 = mixup_multi_targets(x, y0, y1, y2)
-        #else
-        #    y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
+        _p = np.random.rand()
+        if _p < C.aug_cutmix_p:
+            x, y0, y1, y2 = cutmix_multi_targets(x, y0, y1, y2, alpha=1.)
+        elif _p < C.aug_cutmix_p + C.aug_mixup_p:
+            x, y0, y1, y2 = mixup_multi_targets(x, y0, y1, y2)
+        else:
+            y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
 
         ### GridMask ###
-        y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
-        cur_epo = self.trainer.current_epoch
-        GM_MAX_PROB = 0.8  # from paper
-        GM_SATURATE_EPO = 0.1  # 0.8 by paper
-        self.GM_PROB = GM_MAX_PROB * min(1, cur_epo / (C.n_epoch * GM_SATURATE_EPO))
-        if _p < self.GM_PROB:
-            x = self.trans_gridmask(x).to(C.device)
+        # y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
+        # cur_epo = self.trainer.current_epoch
+        # GM_MAX_PROB = 0.8  # from paper
+        # GM_SATURATE_EPO = 0.1  # 0.8 by paper
+        # self.GM_PROB = GM_MAX_PROB * min(1, cur_epo / (C.n_epoch * GM_SATURATE_EPO))
+        # if _p < self.GM_PROB:
+        #     x = self.trans_gridmask(x).to(C.device)
         ### GridMask ###
 
         preds = self.forward(x)

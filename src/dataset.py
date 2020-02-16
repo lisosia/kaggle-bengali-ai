@@ -190,6 +190,40 @@ import cv2
 from skimage.transform import AffineTransform, warp
 import numpy as np
 
+def affine_shear(img):
+    """
+    Args:
+        img: (h, w) or (1, h, w)
+
+    Returns:
+        img: (h, w)
+    """
+    # ch, h, w = img.shape
+    # img = img / 255.
+    if img.ndim == 3:
+        img = img[0]
+
+    # --- scale ---
+    sx = 1
+    sy = 1
+
+    # --- rotation ---
+    rot_angle = 0
+
+    # --- shear ---
+    max_shear_angle = C.aug_shear  #10
+    shear_angle = np.random.uniform(-max_shear_angle, max_shear_angle) * np.pi / 180.
+
+    # --- translation ---
+    tx = 0
+    ty = 0
+
+    tform = AffineTransform(scale=(sx, sy), rotation=rot_angle, shear=shear_angle,
+                            translation=(tx, ty))
+    transformed_image = warp(img, tform)
+    assert transformed_image.ndim == 2
+    return transformed_image
+
 def affine_image(img):
     """
     Args:
@@ -272,6 +306,20 @@ def crop_char_image2(img0, pad=16):
 #    cropped_image = image[left:height - right, top:width - bottom]
 #    return cropped_image
 
+
+MORPH_ERODE_SZ = int(4. * C.image_size[0] / 128)
+MORPH_DILATE_SZ = int(4. * C.image_size[0] / 128)
+print("MORPH ERODE MAX SIZE = ", MORPH_ERODE_SZ)
+print("MORPH DILATE MAX SIZE = ", MORPH_DILATE_SZ)
+def erode(img):
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, tuple(np.random.randint(1, MORPH_ERODE_SZ, 2)))
+    img = cv2.erode(img, kernel, iterations=1)
+    return img
+def dilate(img):
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, tuple(np.random.randint(1, MORPH_DILATE_SZ, 2)))
+    img = cv2.dilate(img, kernel, iterations=1)
+    return img
+
 def resize(image, size=(128, 128)):  # size is (H,W)
     return cv2.resize(image, (size[1], size[0]))
 
@@ -329,12 +377,12 @@ class Transform:
 
         # --- Augmentation ---
         if self.affine:
+            x = affine_shear(x)  # SHEAR ONLY
             x = apply_aug(A.ShiftScaleRotate(
                     shift_limit=(4./C.image_size[0]), scale_limit=tuple(C.aug_scale), rotate_limit=C.aug_rot,
                     border_mode=cv2.BORDER_CONSTANT, value=0., p=1.0),
                     x)
             ## comment out. should rotate around center
-            #    x = affine_image(x)
 
         # --- Train/Test common preprocessing ---
         if self.size is not None:
@@ -342,6 +390,11 @@ class Transform:
 
         if self.sigma > 0.:
             x = add_gaussian_noise(x, sigma=self.sigma)
+
+        if _evaluate_ratio(C.aug_morph):
+            x = erode(x)
+        if _evaluate_ratio(C.aug_morph):
+            x = dilate(x)
 
         # albumentations...
         x = x.astype(np.float32)  # use float

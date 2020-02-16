@@ -183,7 +183,9 @@ class PretrainedCNN(nn.Module):
                 GeM(),
                 # nn.AdaptiveAvgPool2d(1),
                 Flatten(),
-                nn.Linear(512, out_c),
+                nn.Linear(512, 256),
+                Mish(),
+                nn.Linear(256, out_c),
                 )
 
     def __init__(self, model_name='se_resnext101_32x4d',
@@ -209,6 +211,7 @@ class PretrainedCNN(nn.Module):
 
     def forward(self, x):
         if True:
+            # h = torch.stack([x, x, x], 1)
             h = self.conv0(x)
         else:
             h = torch.cat([x, self.mesh.expand(x.size()[0], 2, C.image_size[0], C.image_size[1])], 1)
