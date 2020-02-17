@@ -177,15 +177,15 @@ class PretrainedCNN(nn.Module):
 
     def class_head(self, out_c):
         return Sequential(
-                Mish(),
-                nn.Conv2d(2048, 512, kernel_size=3, stride=1, padding=1, bias=True),
-                nn.BatchNorm2d(512),
+                #Mish(),
+                #nn.Conv2d(2048, 512, kernel_size=3, stride=1, padding=1, bias=True),
+                #nn.BatchNorm2d(512),
                 GeM(),
                 # nn.AdaptiveAvgPool2d(1),
                 Flatten(),
-                nn.Linear(512, 256),
-                Mish(),
-                nn.Linear(256, out_c),
+                #nn.Linear(512, 256),
+                #Mish(),
+                nn.Linear(512, out_c),
                 )
 
     def __init__(self, model_name='se_resnext101_32x4d',
@@ -197,17 +197,18 @@ class PretrainedCNN(nn.Module):
                 in_channels, 3, kernel_size=3, stride=1, padding=1, bias=True)
         else:
             self.mesh = _make_mesh(C.batch_size, C.image_size[0], C.image_size[1]).to(C.device)
+
         self.base_model = pretrainedmodels.__dict__[model_name](pretrained=pretrained)
         activation = F.leaky_relu
         inch = self.base_model.last_linear.in_features
 
         hdim = 512
-        #lin1 = LinearBlock(inch, hdim, use_bn=use_bn, activation=activation, residual=False)
-        #lin2 = LinearBlock(hdim, out_dim, use_bn=use_bn, activation=None, residual=False)
-        #self.lin_layers = Sequential(lin1, lin2)
-        self.tail1 = self.class_head(168)
-        self.tail2 = self.class_head(11)
-        self.tail3 = self.class_head(7)
+        lin1 = LinearBlock(inch, hdim, use_bn=use_bn, activation=activation, residual=False)
+        lin2 = LinearBlock(hdim, out_dim, use_bn=use_bn, activation=None, residual=False)
+        self.lin_layers = Sequential(lin1, lin2)
+        #self.tail1 = self.class_head(168)
+        #self.tail2 = self.class_head(11)
+        #self.tail3 = self.class_head(7)
 
     def forward(self, x):
         if True:
@@ -217,14 +218,18 @@ class PretrainedCNN(nn.Module):
             h = torch.cat([x, self.mesh.expand(x.size()[0], 2, C.image_size[0], C.image_size[1])], 1)
         h = self.base_model.features(h)  # B,2048,2,2 for 64x64input
 
-        out1 = self.tail1(h)
-        out2 = self.tail2(h)
-        out3 = self.tail3(h)
-        return out1, out2, out3
-        #h = torch.sum(h, dim=(-1, -2))
-        #for layer in self.lin_layers:
-        #    h = layer(h)
-        #return h
+        # out1 = self.tail1(h)
+        # out2 = self.tail2(h)
+        # out3 = self.tail3(h)
+        # return out1, out2, out3
+
+        ###h = torch.sum(h, dim=(-1, -2))
+        ## h = _gem(h).view(-1, 2048)
+        h = torch.mean(h, dim=(-1, -2))
+
+        for layer in self.lin_layers:
+            h = layer(h)
+        return h
 
 
 ### Classifer

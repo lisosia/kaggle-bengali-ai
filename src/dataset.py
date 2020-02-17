@@ -375,6 +375,10 @@ class Transform:
         # --- Train/Test common preprocessing ---
         x = crop_char_image2(x / x.max(), pad=C.crop_pad_size)
 
+        # --- Train/Test common preprocessing ---
+        if self.size is not None:
+            x = resize(x, size=self.size)  # H, W
+
         # --- Augmentation ---
         if self.affine:
             x = affine_shear(x)  # SHEAR ONLY
@@ -382,11 +386,6 @@ class Transform:
                     shift_limit=(4./C.image_size[0]), scale_limit=tuple(C.aug_scale), rotate_limit=C.aug_rot,
                     border_mode=cv2.BORDER_CONSTANT, value=0., p=1.0),
                     x)
-            ## comment out. should rotate around center
-
-        # --- Train/Test common preprocessing ---
-        if self.size is not None:
-            x = resize(x, size=self.size)  # H, W
 
         if self.sigma > 0.:
             x = add_gaussian_noise(x, sigma=self.sigma)
