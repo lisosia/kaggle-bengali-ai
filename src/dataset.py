@@ -345,11 +345,12 @@ def apply_aug(aug, image):
 
 
 class Transform:
-    def __init__(self, affine=True, size=(64, 64),
+    def __init__(self, aug, affine=True, size=(64, 64),
                  normalize=False, train=True, threshold=40.,
                  sigma=-1., blur_ratio=0., noise_ratio=0., cutout_ratio=0.,
                  grid_distortion_ratio=0., elastic_distortion_ratio=0., random_brightness_ratio=0.,
                  piece_affine_ratio=0., ssr_ratio=0.):
+        self.aug = aug
         self.affine = affine
         self.size = size
         self.normalize = normalize
@@ -378,7 +379,7 @@ class Transform:
             x = resize(x, size=self.size)  # H, W
         # --- Train/Test common preprocessing ---
 
-        if train:
+        if self.aug:
             # --- Augmentation ---
             if self.affine:
                 x = affine_shear(x)  # SHEAR ONLY
@@ -401,7 +402,7 @@ class Transform:
         assert x.ndim == 2
         # --- Train/Test common preprocessing ---
 
-        if train:
+        if self.aug:
             # 1. blur
             if _evaluate_ratio(self.blur_ratio):
                 r = np.random.uniform()
@@ -483,11 +484,11 @@ def get_trainval_dataset():
     
     train_dataset = BengaliAIDataset(
         train_images, train_labels,
-        transform=Transform(size=C.image_size),
+        transform=Transform(aug=True, size=C.image_size),
         indices=_fold_train)
     valid_dataset = BengaliAIDataset(
         train_images, train_labels,
-        transform=Transform(affine=False, size=C.image_size),
+        transform=Transform(aug=False, affine=False, size=C.image_size, train=True),
         indices=_fold_valid)
 
     print('train_dataset', len(train_dataset), 'valid_dataset', len(valid_dataset))
@@ -512,10 +513,10 @@ def get_trainval_dataset_png():
     
     train_dataset = BengaliAIDatasetPNG(
         x_train, y_train, 
-        transform=Transform(size=C.image_size))
+        transform=Transform(aug=True, size=C.image_size))
     valid_dataset = BengaliAIDatasetPNG(
         x_valid, y_valid, 
-        transform=Transform(affine=False, size=C.image_size))
+        transform=Transform(aug=False, affine=False, size=C.image_size, train=True))
     print('train_dataset', len(train_dataset), 'valid_dataset', len(valid_dataset))
 
     return train_dataset, valid_dataset

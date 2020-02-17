@@ -32,8 +32,14 @@ if True:
 
     train_parser = subparsers.add_parser("train")
     test_parser = subparsers.add_parser("test")
+    valid_parser = subparsers.add_parser("valid")
     
     train_parser.add_argument('--config', required=True)
+    test_parser.add_argument('--config', required=True)
+    valid_parser.add_argument('--config', required=True)
+    test_parser.add_argument('--modelpath', required=True)
+    test_parser.add_argument('--nosub', action='store_true', required=False)
+    valid_parser.add_argument('--modelpath', required=True)
     args = parser.parse_args()
     C = config.get_config(args.config)
 
@@ -41,6 +47,7 @@ from dataset import *
 from model import *
 from myoptim import OneCycleLR
 from trans import *
+from util import *
 
 # --- setup ---
 pd.set_option('max_columns', 50)
@@ -279,6 +286,44 @@ class BengaliModule(pl.LightningModule):
             arr2.append(np.apply_along_axis(softmax, -1, preds2.cpu().numpy()))
         return np.concatenate(arr0), np.concatenate(arr1), np.concatenate(arr2)
 
+    def pred_validation(self):
+        preds_arr = []
+        dl = self.val_dataloader()
+        gt0, gt1, gt2 = [], [], []
+        # for x, y in dl:
+        i = 0
+        with torch.no_grad():
+            for x, y in tqdm(DataLoader(self.valid_dataset, batch_size=C.batch_size, shuffle=False, num_workers=C.num_workers)):
+                x, y = x.to(self.device), y.to(self.device)
+                preds = self.forward(x)
+                preds = [e.cpu().numpy().argmax(axis=-1) for e in preds]
+                preds_arr.append(preds)
+                gt0.append(y[:, 0].cpu().numpy())
+                gt1.append(y[:, 1].cpu().numpy())
+                gt2.append(y[:, 2].cpu().numpy())
+
+                i = i+ 1
+                #if i > 3: break
+        # preds_arr = [np.concatenate(arr, axis=0) for arr in preds_arr]
+        preds_arr = np.array(preds_arr)
+        pred0 = np.concatenate(preds_arr[:, 0])
+        pred1 = np.concatenate(preds_arr[:, 1])
+        pred2 = np.concatenate(preds_arr[:, 2])
+        gt0 = np.concatenate(gt0)
+        gt1 = np.concatenate(gt1)
+        gt2 = np.concatenate(gt2)
+
+        recalls = macro_recall((gt0,gt1,gt2), (pred0,pred1,pred2))
+        print(recalls)
+        plot_cmx(gt0, pred0, "cmx_grapheme_root.jpg", figsize=(150,150))
+        plot_cmx(gt1, pred1, "cmx_vowel.jpg")
+        plot_cmx(gt2, pred2, "cmx_consonant.jpg")
+        #print(pred0.shape)
+        #print(pred0)
+        #print(gt0.shape)
+        #print(gt0)
+
+
 
 def train(args):
     m = BengaliModule(args)
@@ -296,6 +341,12 @@ def train(args):
         fast_dev_run=False)
     trainer.fit(m)
 
+def valid(args):
+    path = args.modelpath
+    model = _load(path).to(C.device)
+    model.eval()
+    model.pred_validation()
+    
 
 # resutre trainer
     # trainer = pl.Trainer()
@@ -306,12 +357,13 @@ def train(args):
 # It seems load_from_checkpoint() assume I passed hparams arg when training?
 def _load(checkpoint_path, map_location=None):
     checkpoint = torch.load(checkpoint_path, map_location=map_location)
-    m = BengaliModule()
+    m = BengaliModule(args)
     m.load_state_dict(checkpoint['state_dict'])
     return m
 
-def test():
-    path = './lightning_logs/version_5/checkpoints/_ckpt_epoch_27.ckpt'
+
+def test(args):
+    path = args.modelpath
     model = _load(path).to(C.device)
     model.eval()
     
@@ -327,7 +379,7 @@ def test():
         print(f'i={i}, n_dataset={n_dataset}')
         test_dataset = BengaliAIDataset(
             test_images, None, 
-            transform=Transform(affine=False, size=(C.image_size, C.image_size), train=False)
+            transform=Transform(aug=False, affine=False, size=C.image_size, train=False)
         )
 
         # INFER
@@ -361,10 +413,11 @@ def test():
     submission_df.to_csv('submission.csv', index=False)
 
 
-
 if __name__ == "__main__":
 
     if args.subcommand == 'train':
         train(args)
     elif args.subcommand == 'test':
-        test()
+        test(args)
+    elif args.subcommand == 'valid':
+        valid(args)
