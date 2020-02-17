@@ -1,0 +1,25 @@
+# TODO. change tail to simple Gem+Linear
+# TODO exchang resize timing in dataset
+n_epoch: 120
+fold: 0
+
+scheduler: 'Adam'
+lr: 0.00001
+batch_size: 128
+
+fold: 0
+use_class_weight: False
+
+aug_cutmix_p:  0.40
+#TODO# aug_cutmix_alpha:  0.8
+aug_mixup_p: 0.40
+
+# previous values was 16
+crop_pad_size: 0
+# no resize
+image_size: [128, 128]
+# moderate scal factor
+aug_scale: [-0.05, 0.05]
+aug_rot: 7
+aug_shear: 10
+aug_morph: 0.3
