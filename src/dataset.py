@@ -374,77 +374,82 @@ class Transform:
 
         # --- Train/Test common preprocessing ---
         x = crop_char_image2(x / x.max(), pad=C.crop_pad_size)
-
-        # --- Train/Test common preprocessing ---
         if self.size is not None:
             x = resize(x, size=self.size)  # H, W
+        # --- Train/Test common preprocessing ---
 
-        # --- Augmentation ---
-        if self.affine:
-            x = affine_shear(x)  # SHEAR ONLY
-            x = apply_aug(A.ShiftScaleRotate(
-                    shift_limit=(4./C.image_size[0]), scale_limit=tuple(C.aug_scale), rotate_limit=C.aug_rot,
-                    border_mode=cv2.BORDER_CONSTANT, value=0., p=1.0),
-                    x)
+        if train:
+            # --- Augmentation ---
+            if self.affine:
+                x = affine_shear(x)  # SHEAR ONLY
+                x = apply_aug(A.ShiftScaleRotate(
+                        shift_limit=(4./C.image_size[0]), scale_limit=tuple(C.aug_scale), rotate_limit=C.aug_rot,
+                        border_mode=cv2.BORDER_CONSTANT, value=0., p=1.0),
+                        x)
 
-        if self.sigma > 0.:
-            x = add_gaussian_noise(x, sigma=self.sigma)
+            if self.sigma > 0.:
+                x = add_gaussian_noise(x, sigma=self.sigma)
 
-        if _evaluate_ratio(C.aug_morph):
-            x = erode(x)
-        if _evaluate_ratio(C.aug_morph):
-            x = dilate(x)
+            if _evaluate_ratio(C.aug_morph):
+                x = erode(x)
+            if _evaluate_ratio(C.aug_morph):
+                x = dilate(x)
 
+        # --- Train/Test common preprocessing ---
         # albumentations...
         x = x.astype(np.float32)  # use float
         assert x.ndim == 2
-        # 1. blur
-        if _evaluate_ratio(self.blur_ratio):
-            r = np.random.uniform()
-            if r < 0.25:
-                x = apply_aug(A.Blur(p=1.0), x)
-            elif r < 0.5:
-                x = apply_aug(A.MedianBlur(blur_limit=5, p=1.0), x)
-            elif r < 0.75:
-                x = apply_aug(A.GaussianBlur(p=1.0), x)
-            else:
-                x = apply_aug(A.MotionBlur(p=1.0), x)
+        # --- Train/Test common preprocessing ---
 
-        # 2. noise
-        if _evaluate_ratio(self.noise_ratio):
-            r = np.random.uniform()
-            if r < 0.50:
-                x = apply_aug(A.GaussNoise(var_limit=5. / 255., p=1.0), x)
-            else:
-                x = apply_aug(A.MultiplicativeNoise(p=1.0), x)  # 乗算ノイズ
+        if train:
+            # 1. blur
+            if _evaluate_ratio(self.blur_ratio):
+                r = np.random.uniform()
+                if r < 0.25:
+                    x = apply_aug(A.Blur(p=1.0), x)
+                elif r < 0.5:
+                    x = apply_aug(A.MedianBlur(blur_limit=5, p=1.0), x)
+                elif r < 0.75:
+                    x = apply_aug(A.GaussianBlur(p=1.0), x)
+                else:
+                    x = apply_aug(A.MotionBlur(p=1.0), x)
 
-        # Cutout
-        if _evaluate_ratio(self.cutout_ratio):
-            # A.Cutout(num_holes=2,  max_h_size=2, max_w_size=2, p=1.0)  # Deprecated...
-            x = apply_aug(A.CoarseDropout(max_holes=8, max_height=8, max_width=8, p=1.0), x)
+            # 2. noise
+            if _evaluate_ratio(self.noise_ratio):
+                r = np.random.uniform()
+                if r < 0.50:
+                    x = apply_aug(A.GaussNoise(var_limit=5. / 255., p=1.0), x)
+                else:
+                    x = apply_aug(A.MultiplicativeNoise(p=1.0), x)  # 乗算ノイズ
 
-        if _evaluate_ratio(self.grid_distortion_ratio):
-            x = apply_aug(A.GridDistortion(p=1.0), x)
+            # Cutout
+            if _evaluate_ratio(self.cutout_ratio):
+                # A.Cutout(num_holes=2,  max_h_size=2, max_w_size=2, p=1.0)  # Deprecated...
+                x = apply_aug(A.CoarseDropout(max_holes=8, max_height=8, max_width=8, p=1.0), x)
 
-        if _evaluate_ratio(self.elastic_distortion_ratio):
-            x = apply_aug(A.ElasticTransform(
-                sigma=50, alpha=1, alpha_affine=10, p=1.0), x)
+            if _evaluate_ratio(self.grid_distortion_ratio):
+                x = apply_aug(A.GridDistortion(p=1.0), x)
 
-        if _evaluate_ratio(self.random_brightness_ratio):
-            # A.RandomBrightness(p=1.0)  # Deprecated...
-            # A.RandomContrast(p=1.0)    # Deprecated...
-            x = apply_aug(A.RandomBrightnessContrast(p=1.0), x)
+            if _evaluate_ratio(self.elastic_distortion_ratio):
+                x = apply_aug(A.ElasticTransform(
+                    sigma=50, alpha=1, alpha_affine=10, p=1.0), x)
 
-        if _evaluate_ratio(self.piece_affine_ratio):
-            x = apply_aug(A.IAAPiecewiseAffine(p=1.0), x)
+            if _evaluate_ratio(self.random_brightness_ratio):
+                # A.RandomBrightness(p=1.0)  # Deprecated...
+                # A.RandomContrast(p=1.0)    # Deprecated...
+                x = apply_aug(A.RandomBrightnessContrast(p=1.0), x)
 
-        if _evaluate_ratio(self.ssr_ratio):
-            x = apply_aug(A.ShiftScaleRotate(
-                shift_limit=0.0625,
-                scale_limit=0.1,
-                rotate_limit=30,
-                p=1.0), x)
+            if _evaluate_ratio(self.piece_affine_ratio):
+                x = apply_aug(A.IAAPiecewiseAffine(p=1.0), x)
 
+            if _evaluate_ratio(self.ssr_ratio):
+                x = apply_aug(A.ShiftScaleRotate(
+                    shift_limit=0.0625,
+                    scale_limit=0.1,
+                    rotate_limit=30,
+                    p=1.0), x)
+
+        # --- Train/Test common preprocessing ---
         if self.normalize:
             x = (x.astype(np.float32) - 0.0692) / 0.2051
         if x.ndim == 2:
@@ -455,6 +460,7 @@ class Transform:
             return x, y
         else:
             return x
+        # --- Train/Test common preprocessing ---
 
 
 # load data
