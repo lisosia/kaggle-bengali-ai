@@ -380,6 +380,11 @@ class Transform:
         # --- Train/Test common preprocessing ---
 
         if self.aug:
+            if _evaluate_ratio(C.aug_auto_contrast_p):
+                p = 99.5 + 0.5 * np.random.uniform()
+                x = np.clip(x / np.percentile(x, p), 0, 1)
+
+        if self.aug:
             # --- Augmentation ---
             if self.affine:
                 x = affine_shear(x)  # SHEAR ONLY

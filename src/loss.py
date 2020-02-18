@@ -101,7 +101,7 @@ def cutmix_multi_targets(data, targets1, targets2, targets3, alpha):
     #return data, targets
 
 ALPHA = 0.4  # fastai kernel
-def mixup_multi_targets(inputs, targets1, targets2, targets3, alpha=ALPHA):
+def mixup_multi_targets(inputs, targets1, targets2, targets3, alpha):
     """Mixup on 1x32x32 mel-spectrograms.
     """
     targets1, targets2, targets3 = onehot(targets1, 168), onehot(targets2, 11), onehot(targets3, 7)
@@ -121,7 +121,7 @@ def mixup_multi_targets(inputs, targets1, targets2, targets3, alpha=ALPHA):
 
     return inputs, targets1, targets2, targets3
 
-def mixup(inputs, targets, alpha=ALPHA):
+def mixup(inputs, targets, alpha):
     """Mixup on 1x32x32 mel-spectrograms.
     """
     s = inputs.size()[0]
@@ -135,7 +135,7 @@ def mixup(inputs, targets, alpha=ALPHA):
     targets = weight*y1 + (1-weight)*y2
     return inputs, targets
 
-def _mixup_not_onehot(inputs, targets, num_classes, alpha=ALPHA):
+def _mixup_not_onehot(inputs, targets, num_classes, alpha):
     """Mixup on 1x32x32 mel-spectrograms.
     """
     s = inputs.size()[0]

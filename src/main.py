@@ -156,9 +156,9 @@ class BengaliModule(pl.LightningModule):
 
         _p = np.random.rand()
         if _p < C.aug_cutmix_p:
-            x, y0, y1, y2 = cutmix_multi_targets(x, y0, y1, y2, alpha=1.)
+            x, y0, y1, y2 = cutmix_multi_targets(x, y0, y1, y2, alpha=C.aug_cutmix_alpha)  # alpha 1 is recoomended
         elif _p < C.aug_cutmix_p + C.aug_mixup_p:
-            x, y0, y1, y2 = mixup_multi_targets(x, y0, y1, y2)
+            x, y0, y1, y2 = mixup_multi_targets(x, y0, y1, y2, alpha=C.aug_mixup_alpha)
         else:
             y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
 
@@ -253,9 +253,10 @@ class BengaliModule(pl.LightningModule):
                 optimizer, mode='min', factor=0.5, patience=8, min_lr=C.lr*C.batch_size/32., verbose=True)
         elif C.scheduler == 'Cosine':
             # https://www.kaggle.com/c/bengaliai-cv19/discussion/123198#719043
-            optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=C.lr * C.batch_size)  # 0.001 for bs=32
+            init_lr = C.lr * C.batch_size
+            optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=init_lr)  # 0.001 for bs=32
             scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                optimizer, C.n_epoch)
+                optimizer, C.n_epoch, eta_min=init_lr / 100.)
         else:
             raise "unknown optim"
             
