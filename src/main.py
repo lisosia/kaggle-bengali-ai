@@ -256,7 +256,7 @@ class BengaliModule(pl.LightningModule):
             init_lr = C.lr * C.batch_size
             optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=init_lr)  # 0.001 for bs=32
             scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                optimizer, C.n_epoch, eta_min=init_lr / 100.)
+                optimizer, C.n_epoch, eta_min=init_lr / 16.)
         else:
             raise "unknown optim"
             
