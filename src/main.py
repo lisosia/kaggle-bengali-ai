@@ -250,7 +250,7 @@ class BengaliModule(pl.LightningModule):
             # optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=0.001 * C.batch_size / 32)  # 0.001 for bs=32
             optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=C.lr * C.batch_size)
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer, mode='min', factor=0.5, patience=5, min_lr=C.lr*C.batch_size/32., verbose=True)
+                optimizer, mode='min', factor=0.5, patience=8, min_lr=C.lr*C.batch_size/32., verbose=True)
         elif C.scheduler == 'Cosine':
             # https://www.kaggle.com/c/bengaliai-cv19/discussion/123198#719043
             optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=C.lr * C.batch_size)  # 0.001 for bs=32
