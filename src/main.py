@@ -297,28 +297,39 @@ class BengaliModule(pl.LightningModule):
         preds_arr = []
         dl = self.val_dataloader()
         gt0, gt1, gt2 = [], [], []
+        pr0, pr1, pr2 = [], [], []
         # for x, y in dl:
         i = 0
         with torch.no_grad():
             for x, y in tqdm(DataLoader(self.valid_dataset, batch_size=C.batch_size, shuffle=False, num_workers=C.num_workers)):
                 x, y = x.to(self.device), y.to(self.device)
                 preds = self.forward(x)
-                preds = [e.cpu().numpy().argmax(axis=-1) for e in preds]
-                preds_arr.append(preds)
+                # preds = [e.cpu().numpy().argmax(axis=-1) for e in preds]
+                # preds = [e.cpu().numpy() for e in preds]
+                pr0.append(preds[0].cpu().numpy()) #shape is [B,168]
+                pr1.append(preds[1].cpu().numpy())
+                pr2.append(preds[2].cpu().numpy())
                 gt0.append(y[:, 0].cpu().numpy())
                 gt1.append(y[:, 1].cpu().numpy())
                 gt2.append(y[:, 2].cpu().numpy())
 
                 i = i+ 1
-                #if i > 3: break
+                # if i > 3: break
         # preds_arr = [np.concatenate(arr, axis=0) for arr in preds_arr]
-        preds_arr = np.array(preds_arr)
-        pred0 = np.concatenate(preds_arr[:, 0])
-        pred1 = np.concatenate(preds_arr[:, 1])
-        pred2 = np.concatenate(preds_arr[:, 2])
+        pr0 = np.concatenate(np.array(pr0))
+        pr1 = np.concatenate(np.array(pr1))
+        pr2 = np.concatenate(np.array(pr2))
+        print(pr0.shape)
+        pred0 = pr0.argmax(axis=-1)
+        pred1 = pr1.argmax(axis=-1)
+        pred2 = pr2.argmax(axis=-1)
         gt0 = np.concatenate(gt0)
         gt1 = np.concatenate(gt1)
         gt2 = np.concatenate(gt2)
+        import pickle
+        with open('pred_gt.pickle', mode='wb') as f:
+            pickle.dump([pr0,pr1,pr2,gt0,gt1,gt2], f)
+        exit()
 
         recalls = macro_recall((gt0,gt1,gt2), (pred0,pred1,pred2))
         print(recalls)
