@@ -257,6 +257,12 @@ class BengaliModule(pl.LightningModule):
             optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=init_lr)  # 0.001 for bs=32
             scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
                 optimizer, C.n_epoch, eta_min=init_lr / 16.)
+        elif C.scheduler == 'Cosine_SGD':
+            # https://www.kaggle.com/c/bengaliai-cv19/discussion/123198#719043
+            init_lr = C.lr * C.batch_size
+            optimizer =  torch.optim.SGD(self.classifier.parameters(), lr=init_lr, nesterov=True, momentum=0.9)
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, C.n_epoch, eta_min=init_lr / 16.)
         else:
             raise "unknown optim"
             
