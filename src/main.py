@@ -164,12 +164,13 @@ class BengaliModule(pl.LightningModule):
 
         ### GridMask ###
         # y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
-        # cur_epo = self.trainer.current_epoch
-        # GM_MAX_PROB = 0.8  # from paper
-        # GM_SATURATE_EPO = 0.1  # 0.8 by paper
-        # self.GM_PROB = GM_MAX_PROB * min(1, cur_epo / (C.n_epoch * GM_SATURATE_EPO))
-        # if _p < self.GM_PROB:
-        #     x = self.trans_gridmask(x).to(C.device)
+        _gridmask_p = np.random.rand()
+        cur_epo = self.trainer.current_epoch
+        GM_MAX_PROB = C.aug_gridmask_p #0.8 is from paper
+        GM_SATURATE_EPO = 0.1  # 0.8 by paper
+        self.GM_PROB = GM_MAX_PROB * min(1, cur_epo / (C.n_epoch * GM_SATURATE_EPO))
+        if _gridmask_p < self.GM_PROB:
+            x = self.trans_gridmask(x).to(C.device)
         ### GridMask ###
 
         preds = self.forward(x)
@@ -248,7 +249,8 @@ class BengaliModule(pl.LightningModule):
                 optimizer, num_steps=TOTAL_STEPS, lr_range=(MIN_LR, MAX_LR))
         elif C.scheduler == 'Adam':
             # optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=0.001 * C.batch_size / 32)  # 0.001 for bs=32
-            optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=C.lr * C.batch_size)
+            optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=C.lr * C.batch_size,
+                    weight_decay=C.weight_decay)
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 optimizer, mode='min', factor=0.5, patience=8, min_lr=C.lr*C.batch_size/32., verbose=True)
         elif C.scheduler == 'Cosine':
