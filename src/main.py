@@ -308,9 +308,9 @@ class BengaliModule(pl.LightningModule):
                 preds = self.forward(x)
                 # preds = [e.cpu().numpy().argmax(axis=-1) for e in preds]
                 # preds = [e.cpu().numpy() for e in preds]
-                pr0.append(preds[0].cpu().numpy()) #shape is [B,168]
-                pr1.append(preds[1].cpu().numpy())
-                pr2.append(preds[2].cpu().numpy())
+                pr0.append(np.apply_along_axis(softmax, -1, preds[0].cpu().numpy())) #shape is [B,168]
+                pr1.append(np.apply_along_axis(softmax, -1, preds[1].cpu().numpy()))
+                pr2.append(np.apply_along_axis(softmax, -1, preds[2].cpu().numpy()))
                 gt0.append(y[:, 0].cpu().numpy())
                 gt1.append(y[:, 1].cpu().numpy())
                 gt2.append(y[:, 2].cpu().numpy())
@@ -322,19 +322,22 @@ class BengaliModule(pl.LightningModule):
         pr1 = np.concatenate(np.array(pr1))
         pr2 = np.concatenate(np.array(pr2))
         print(pr0.shape)
-        pred0 = pr0.argmax(axis=-1)
-        pred1 = pr1.argmax(axis=-1)
-        pred2 = pr2.argmax(axis=-1)
+        # pred0 = pr0.argmax(axis=-1)
+        # pred1 = pr1.argmax(axis=-1)
+        # pred2 = pr2.argmax(axis=-1)
+        pred0 = (pr0 / np.array(COUNT_GRAPHEME )).argmax(axis=-1)
+        pred1 = (pr1 / np.array(COUNT_VOWEL    )).argmax(axis=-1)
+        pred2 = (pr2 / np.array(COUNT_CONSONANT)).argmax(axis=-1)
         gt0 = np.concatenate(gt0)
         gt1 = np.concatenate(gt1)
         gt2 = np.concatenate(gt2)
         import pickle
         with open('pred_gt.pickle', mode='wb') as f:
             pickle.dump([pr0,pr1,pr2,gt0,gt1,gt2], f)
-        exit()
 
         recalls = macro_recall((gt0,gt1,gt2), (pred0,pred1,pred2))
         print(recalls)
+        exit()
         plot_cmx(gt0, pred0, "cmx_grapheme_root.jpg", figsize=(150,150))
         plot_cmx(gt1, pred1, "cmx_vowel.jpg")
         plot_cmx(gt2, pred2, "cmx_consonant.jpg")
@@ -417,9 +420,9 @@ def test(args):
         del test_images
         gc.collect()
 
-    preds0 = np.concatenate(preds0).argmax(axis=-1)
-    preds1 = np.concatenate(preds1).argmax(axis=-1)
-    preds2 = np.concatenate(preds2).argmax(axis=-1)
+    preds0 = ( np.concatenate(preds0) / np.array(COUNT_GRAPHEME ) ).argmax(axis=-1)
+    preds1 = ( np.concatenate(preds1) / np.array(COUNT_VOWEL    ) ).argmax(axis=-1)
+    preds2 = ( np.concatenate(preds2) / np.array(COUNT_CONSONANT) ).argmax(axis=-1)
     print('shapes:', 'p0', preds0.shape, 'p1', preds1.shape, 'p2', preds2.shape)
 
     # SUBMISSION

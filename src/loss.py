@@ -9,7 +9,8 @@ https://arxiv.org/abs/1710.09412
 
 __author__ = 'Yuan Xu, Erdene-Ochir Tuguldur'
 
-__all__ = [ 'mixup_cross_entropy_loss', 'mixup', 'mixup_multi_targets', 'cutmix_multi_targets', 'onehot']
+__all__ = [ 'mixup_cross_entropy_loss', 'mixup', 'mixup_multi_targets', 'cutmix_multi_targets', 'onehot',
+            'COUNT_GRAPHEME', 'COUNT_VOWEL', 'COUNT_CONSONANT']
 
 import numpy as np
 import torch
