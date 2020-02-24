@@ -79,14 +79,18 @@ def calc_macro_recall(solution, submission):
     return final_score
 
 
-def accuracy(y, t):
-    pred_label = torch.argmax(y, dim=1)
-    t = torch.argmax(t, dim=1)
+def accuracy(_y, _t):
+    # y = _y.cpu().numpy() if isinstance(_y, torch.Tensor) else _y
+    t = _t.cpu().numpy()
+    pred_label = _y.argmax(axis=-1).astype(int)
+    t = t.argmax(axis=-1).astype(int)
 
     count = pred_label.shape[0]
-    correct = (pred_label == t).sum().type(torch.float32)
+    correct = (pred_label == t).sum().astype(float)
     acc = correct / count
-    return acc.item(), pred_label.tolist()
+
+    return acc, pred_label
+    # return acc.item(), pred_label.tolist()
     # return acc
 
 def softmax(x):
@@ -132,9 +136,12 @@ class BengaliModule(pl.LightningModule):
         loss_consonant = mixup_cross_entropy_loss(preds[2], y2, class_dx=2)
         loss = 3*0.5* loss_grapheme + 3*0.25* loss_vowel + 3*0.25* loss_consonant  # back compati
 
-        acc_grapheme, y_hat0 = accuracy(preds[0], y0)
-        acc_vowel, y_hat1 = accuracy(preds[1], y1)
-        acc_consonant, y_hat2 = accuracy(preds[2], y2)
+        preds0 = np.apply_along_axis(softmax, -1, preds[0].detach().cpu().numpy())
+        preds1 = np.apply_along_axis(softmax, -1, preds[1].detach().cpu().numpy())
+        preds2 = np.apply_along_axis(softmax, -1, preds[2].detach().cpu().numpy())
+        acc_grapheme, y_hat0  = accuracy(preds0 / np.array(COUNT_GRAPHEME ).reshape(1,168), y0)
+        acc_vowel, y_hat1     = accuracy(preds1 / np.array(COUNT_VOWEL    ).reshape(1, 11), y1)
+        acc_consonant, y_hat2 = accuracy(preds2 / np.array(COUNT_CONSONANT).reshape(1,  7), y2)
         logs = {
             f'loss/{log_prefix}_total_loss': loss.item(),
             f'loss/{log_prefix}_loss_grapheme': loss_grapheme.item(),
