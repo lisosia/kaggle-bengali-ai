@@ -374,7 +374,8 @@ class Transform:
             x = example
 
         # --- Train/Test common preprocessing ---
-        x = crop_char_image2(x / x.max(), pad=C.crop_pad_size)
+        if C.crop:
+            x = crop_char_image2(x / x.max(), pad=C.crop_pad_size)
         if self.size is not None:
             x = resize(x, size=self.size)  # H, W
         # --- Train/Test common preprocessing ---
