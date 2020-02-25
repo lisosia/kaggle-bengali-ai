@@ -118,7 +118,8 @@ class BengaliModule(pl.LightningModule):
         self.classifier = BengaliClassifier(predictor).to(self.device)
 
         # load data after model is in cuda
-        self.train_dataset, self.valid_dataset = get_trainval_dataset_png()
+        if args.subcommand != 'test':
+            self.train_dataset, self.valid_dataset = get_trainval_dataset_png()
 
         self.GM_PROB = None
         self.trans_gridmask = GridMask(
