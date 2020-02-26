@@ -43,6 +43,9 @@ if True:
     args = parser.parse_args()
     C = config.get_config(args.config)
 
+    if args.subcommand == 'test':
+        C.use_pretrain = False
+
 from dataset import *
 from model import *
 from myoptim import OneCycleLR
@@ -113,7 +116,8 @@ class BengaliModule(pl.LightningModule):
         print('n_total', n_total)
 
         # Set pretrained='imagenet' to download imagenet pretrained model...
-        predictor = PretrainedCNN(in_channels=1, out_dim=n_total, model_name=C.model_name, pretrained=None).to(self.device)
+        predictor = PretrainedCNN(in_channels=1, out_dim=n_total, model_name=C.model_name,
+                pretrained='imagenet' if C.use_pretrain else None).to(self.device)
         print('predictor', type(predictor))
         self.classifier = BengaliClassifier(predictor).to(self.device)
 
@@ -359,7 +363,7 @@ class BengaliModule(pl.LightningModule):
 def train(args):
     m = BengaliModule(args)
     checkpoint_callback = ModelCheckpoint(
-    filepath=os.getcwd(),
+    filepath=f'lightning_logs/{os.path.basename(args.config)}',
     save_top_k=3,
     verbose=True,
     monitor='recall/weight_mean',

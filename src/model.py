@@ -211,9 +211,10 @@ class PretrainedCNN(nn.Module):
         #self.tail3 = self.class_head(7)
 
     def forward(self, x):
-        if True:
-            # h = torch.stack([x, x, x], 1)
+        if False:
             h = self.conv0(x)
+        elif True:
+            h = x.repeat(1, 3, 1, 1)
         else:
             h = torch.cat([x, self.mesh.expand(x.size()[0], 2, C.image_size[0], C.image_size[1])], 1)
         h = self.base_model.features(h)  # B,2048,2,2 for 64x64input
