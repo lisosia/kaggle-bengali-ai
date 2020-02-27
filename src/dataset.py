@@ -472,7 +472,25 @@ class Transform:
 
 # load data
 train = pd.read_csv(C.datadir/'train.csv')
-train_labels = train[['grapheme_root', 'vowel_diacritic', 'consonant_diacritic']].values
+train_labels = train[['grapheme_root', 'vowel_diacritic', 'consonant_diacritic']].values.astype(np.int64)
+
+# components label
+parts_pre = pd.read_csv(C.datadir/'class_map.csv').component
+parts = np.sort(np.unique(np.concatenate([list(e) for e in parts_pre])))
+parts = parts[parts != '0']  # 0 has no meanning
+print("parts:", parts)
+
+train_labels_comp = []
+for grapheme in train['grapheme'].values:
+    train_labels_comp.append([part in list(grapheme) for part in parts])
+train_labels_comp = np.array(train_labels_comp).astype(np.int64)
+print("train_labels_comp.shape", train_labels_comp.shape)
+if True:
+    print("train_labels_comp", train_labels_comp[0].tolist())
+    print("train_labels_comp", train_labels_comp[1].tolist())
+    print("train_labels_comp", train_labels_comp[2].tolist())
+train_labels = np.concatenate([train_labels, train_labels_comp], axis=1)
+print("train_labels", train_labels.shape)
 
 def get_trainval_dataset():
     _time_start = time.time()

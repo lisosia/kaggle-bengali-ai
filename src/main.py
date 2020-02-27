@@ -116,7 +116,7 @@ class BengaliModule(pl.LightningModule):
         print('n_total', n_total)
 
         # Set pretrained='imagenet' to download imagenet pretrained model...
-        predictor = PretrainedCNN(in_channels=1, out_dim=n_total, model_name=C.model_name,
+        predictor = PretrainedCNN(in_channels=1, out_dim=n_total + 61, model_name=C.model_name,
                 pretrained='imagenet' if C.use_pretrain else None).to(self.device)
         print('predictor', type(predictor))
         self.classifier = BengaliClassifier(predictor).to(self.device)
@@ -133,13 +133,14 @@ class BengaliModule(pl.LightningModule):
         return self.classifier(x.to(self.device))  # todo return [logi1, logi2, logi3]
 
     @staticmethod
-    def _calc_loss_metric(preds, y0, y1, y2, log_prefix):
+    def _calc_loss_metric(preds, y0, y1, y2, y3, log_prefix):
         """return loss(torch.Tensor) and log(not Tensor)"""
         # _loss_func = mixup_cross_entropy_loss if do_mixup else torch.nn.functional.cross_entropy
         loss_grapheme = mixup_cross_entropy_loss(preds[0], y0, class_dx=0)
         loss_vowel = mixup_cross_entropy_loss(preds[1], y1, class_dx=1)
         loss_consonant = mixup_cross_entropy_loss(preds[2], y2, class_dx=2)
-        loss = 3*0.5* loss_grapheme + 3*0.25* loss_vowel + 3*0.25* loss_consonant  # back compati
+        loss_comp = mixup_binary_cross_entropy_loss(preds[3], y3)
+        loss = 3*0.5* loss_grapheme + 3*0.25* loss_vowel + 3*0.25* loss_consonant + 3*0.25*loss_comp
 
         preds0 = np.apply_along_axis(softmax, -1, preds[0].detach().cpu().numpy())
         preds1 = np.apply_along_axis(softmax, -1, preds[1].detach().cpu().numpy())
@@ -152,6 +153,7 @@ class BengaliModule(pl.LightningModule):
             f'loss/{log_prefix}_loss_grapheme': loss_grapheme.item(),
             f'loss/{log_prefix}_loss_vowel': loss_vowel.item(),
             f'loss/{log_prefix}_loss_consonant': loss_consonant.item(),
+            f'loss/{log_prefix}_loss_comp': loss_comp.item(),
             f'acc/{log_prefix}_acc_grapheme': acc_grapheme,
             f'acc/{log_prefix}_acc_vowel': acc_vowel,
             f'acc/{log_prefix}_acc_consonant': acc_consonant,
@@ -164,13 +166,13 @@ class BengaliModule(pl.LightningModule):
         x = x.to(self.device)
         y = y.to(self.device)
 
-        y0, y1, y2 = y[:, 0], y[:, 1], y[:, 2]
+        y0, y1, y2, y3 = y[:, 0], y[:, 1], y[:, 2], y[:, 3:]
 
         _p = np.random.rand()
         if _p < C.aug_cutmix_p:
-            x, y0, y1, y2 = cutmix_multi_targets(x, y0, y1, y2, alpha=C.aug_cutmix_alpha)  # alpha 1 is recoomended
+            x, y0, y1, y2, y3 = cutmix_multi_targets(x, y0, y1, y2, y3, alpha=C.aug_cutmix_alpha)  # alpha 1 is recoomended
         elif _p < C.aug_cutmix_p + C.aug_mixup_p:
-            x, y0, y1, y2 = mixup_multi_targets(x, y0, y1, y2, alpha=C.aug_mixup_alpha)
+            x, y0, y1, y2, y3 = mixup_multi_targets(x, y0, y1, y2, y3, alpha=C.aug_mixup_alpha)
         else:
             y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
 
@@ -186,7 +188,7 @@ class BengaliModule(pl.LightningModule):
         ### GridMask ###
 
         preds = self.forward(x)
-        loss, logs, _ = self._calc_loss_metric(preds, y0, y1, y2, log_prefix='train')
+        loss, logs, _ = self._calc_loss_metric(preds, y0, y1, y2, y3, log_prefix='train')
 
         return {'loss': loss, 'log': logs}
 
@@ -194,12 +196,12 @@ class BengaliModule(pl.LightningModule):
         # OPTIONAL
         x, y = batch
         x, y = x.to(self.device), y.to(self.device)
-        y0, y1, y2 = y[:, 0], y[:, 1], y[:, 2]
+        y0, y1, y2, y3 = y[:, 0], y[:, 1], y[:, 2], y[:, 3:]
         y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
 
         preds = self.forward(x)
 
-        _, logs, y_hat_arr = self._calc_loss_metric(preds, y0, y1, y2, log_prefix='val')
+        _, logs, y_hat_arr = self._calc_loss_metric(preds, y0, y1, y2, y3, log_prefix='val')
 
         return {'_val_log' : logs, 
                 'y_true' : np.swapaxes(y.cpu().numpy(), 0, 1),  # shape is class(3), B

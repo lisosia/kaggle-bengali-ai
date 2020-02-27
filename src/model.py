@@ -240,7 +240,8 @@ class BengaliClassifier(nn.Module):
         self.n_grapheme = n_grapheme
         self.n_vowel = n_vowel
         self.n_consonant = n_consonant
-        self.n_total_class = self.n_grapheme + self.n_vowel + self.n_consonant
+        self.n_comp = 61
+        self.n_total_class = self.n_grapheme + self.n_vowel + self.n_consonant + self.n_comp
         self.predictor = predictor
 
         self.metrics_keys = [
@@ -255,7 +256,8 @@ class BengaliClassifier(nn.Module):
             preds = pred
         else:
             assert pred.shape[1] == self.n_total_class
-            preds = torch.split(pred, [self.n_grapheme, self.n_vowel, self.n_consonant], dim=1)
+            preds = torch.split(pred, [self.n_grapheme, self.n_vowel, self.n_consonant, self.n_comp], dim=1)
+            # preds = torch.split(pred, [self.n_grapheme, self.n_vowel, self.n_consonant], dim=1)
         return preds
 
     def calc(self, data_loader):

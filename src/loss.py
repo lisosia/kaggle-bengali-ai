@@ -10,7 +10,7 @@ https://arxiv.org/abs/1710.09412
 __author__ = 'Yuan Xu, Erdene-Ochir Tuguldur'
 
 __all__ = [ 'mixup_cross_entropy_loss', 'mixup', 'mixup_multi_targets', 'cutmix_multi_targets', 'onehot',
-            'COUNT_GRAPHEME', 'COUNT_VOWEL', 'COUNT_CONSONANT']
+            'COUNT_GRAPHEME', 'COUNT_VOWEL', 'COUNT_CONSONANT', 'mixup_binary_cross_entropy_loss']
 
 import numpy as np
 import torch
@@ -49,6 +49,16 @@ def mixup_cross_entropy_loss(input, target, class_dx, size_average=True):
 
     return loss / input.size()[0] if size_average else loss
 
+def mixup_binary_cross_entropy_loss(input, target, size_average=True):
+    assert input.size() == target.size()
+    assert isinstance(input, Variable) and isinstance(target, Variable)
+    assert input.size(1) == 61
+    input1 = torch.log(    torch.nn.functional.sigmoid(input).clamp(1e-5, 1))
+    input2 = torch.log(1 - torch.nn.functional.sigmoid(input).clamp(1e-5, 1))
+    loss = - (torch.sum(input1 * target) + torch.sum(input2 * (1.-target))) / 61.
+
+    return loss / input.size()[0] if size_average else loss
+
 def onehot(targets, num_classes):
     """Origin: https://github.com/moskomule/mixup.pytorch
     convert index tensor into onehot tensor
@@ -77,7 +87,7 @@ def rand_bbox(size, lam):
     return bbx1, bby1, bbx2, bby2
 
 # https://www.kaggle.com/c/bengaliai-cv19/discussion/126504
-def cutmix_multi_targets(data, targets1, targets2, targets3, alpha):
+def cutmix_multi_targets(data, targets1, targets2, targets3, targets4, alpha):
     targets1, targets2, targets3 = onehot(targets1, 168), onehot(targets2, 11), onehot(targets3, 7)
 
     indices = torch.randperm(data.size(0))
@@ -85,6 +95,7 @@ def cutmix_multi_targets(data, targets1, targets2, targets3, alpha):
     shuffled_targets1 = targets1[indices]
     shuffled_targets2 = targets2[indices]
     shuffled_targets3 = targets3[indices]
+    shuffled_targets4 = targets4[indices]
 
     lam = np.random.beta(alpha, alpha)
     bbx1, bby1, bbx2, bby2 = rand_bbox(data.size(), lam)
@@ -96,13 +107,14 @@ def cutmix_multi_targets(data, targets1, targets2, targets3, alpha):
     t1 = lam*targets1 + (1-lam)*shuffled_targets1
     t2 = lam*targets2 + (1-lam)*shuffled_targets2
     t3 = lam*targets3 + (1-lam)*shuffled_targets3
-    return data, t1, t2, t3
+    t4 = lam*targets4 + (1-lam)*shuffled_targets4
+    return data, t1, t2, t3,  t4
     ## original code
     #targets = [targets1, shuffled_targets1, targets2, shuffled_targets2, targets3, shuffled_targets3, lam]
     #return data, targets
 
 ALPHA = 0.4  # fastai kernel
-def mixup_multi_targets(inputs, targets1, targets2, targets3, alpha):
+def mixup_multi_targets(inputs, targets1, targets2, targets3, targets4, alpha):
     """Mixup on 1x32x32 mel-spectrograms.
     """
     targets1, targets2, targets3 = onehot(targets1, 168), onehot(targets2, 11), onehot(targets3, 7)
@@ -119,8 +131,9 @@ def mixup_multi_targets(inputs, targets1, targets2, targets3, alpha):
     targets1 = weight*targets1 + (1-weight)*targets1[index,]
     targets2 = weight*targets2 + (1-weight)*targets2[index,]
     targets3 = weight*targets3 + (1-weight)*targets3[index,]
+    targets4 = weight*targets4 + (1-weight)*targets4[index,]
 
-    return inputs, targets1, targets2, targets3
+    return inputs, targets1, targets2, targets3, targets4
 
 def mixup(inputs, targets, alpha):
     """Mixup on 1x32x32 mel-spectrograms.
