@@ -231,7 +231,7 @@ class BengaliModule(pl.LightningModule):
                 print('{}:{:.5f}   '.format(k, v), end='')
         print('')
 
-        return {'val_loss': 1 - tf_logs['recall/recall_grapheme'], 'log': tf_logs}
+        return {'val_loss': 1 - tf_logs['recall/weight_mean'], 'log': tf_logs}
         # return {'val_loss': tf_logs['loss/val_total_loss'], 'log': tf_logs}
         # return {'val_loss': tf_logs['loss/val_total_loss'], 'log': tf_logs, 'progress_bar': tf_logs}
         
@@ -259,12 +259,12 @@ class BengaliModule(pl.LightningModule):
             optimizer =  torch.optim.AdamW(self.classifier.parameters(), lr=MIN_LR, weight_decay=1.25e-4)
             scheduler = OneCycleLR(
                 optimizer, num_steps=TOTAL_STEPS, lr_range=(MIN_LR, MAX_LR))
-        elif C.scheduler == 'Adam':
+        elif C.scheduler == 'ReduceLR':
             # optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=0.001 * C.batch_size / 32)  # 0.001 for bs=32
             optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=C.lr * C.batch_size,
                     weight_decay=C.weight_decay)
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer, mode='min', factor=0.5, patience=8, min_lr=C.lr*C.batch_size/32., verbose=True)
+                optimizer, mode='min', factor=0.7, patience=5, min_lr=C.lr*C.batch_size/16., verbose=True)
         elif C.scheduler == 'Cosine':
             # https://www.kaggle.com/c/bengaliai-cv19/discussion/123198#719043
             init_lr = C.lr * C.batch_size
