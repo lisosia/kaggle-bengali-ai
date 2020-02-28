@@ -140,7 +140,7 @@ class BengaliModule(pl.LightningModule):
         loss_vowel = mixup_cross_entropy_loss(preds[1], y1, class_dx=1)
         loss_consonant = mixup_cross_entropy_loss(preds[2], y2, class_dx=2)
         loss_comp = mixup_binary_cross_entropy_loss(preds[3], y3)
-        loss = 3*0.5* loss_grapheme + 3*0.25* loss_vowel + 3*0.25* loss_consonant + 3*0.25*loss_comp
+        loss = 3*0.5* loss_grapheme + 3*0.25* loss_vowel + 3*0.25* loss_consonant + 3*0.006*loss_comp
 
         preds0 = np.apply_along_axis(softmax, -1, preds[0].detach().cpu().numpy())
         preds1 = np.apply_along_axis(softmax, -1, preds[1].detach().cpu().numpy())

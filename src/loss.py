@@ -53,9 +53,9 @@ def mixup_binary_cross_entropy_loss(input, target, size_average=True):
     assert input.size() == target.size()
     assert isinstance(input, Variable) and isinstance(target, Variable)
     assert input.size(1) == 61
-    input1 = torch.log(    torch.nn.functional.sigmoid(input).clamp(1e-5, 1))
-    input2 = torch.log(1 - torch.nn.functional.sigmoid(input).clamp(1e-5, 1))
-    loss = - (torch.sum(input1 * target) + torch.sum(input2 * (1.-target))) / 61.
+    input1 = torch.log(     torch.nn.functional.sigmoid(input).clamp(1e-5, 1))
+    input2 = torch.log((1 - torch.nn.functional.sigmoid(input)).clamp(1e-5, 1))
+    loss = - (torch.sum(input1 * target) + torch.sum(input2 * (1.-target)))
 
     return loss / input.size()[0] if size_average else loss
 
