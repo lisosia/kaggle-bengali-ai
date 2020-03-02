@@ -10,7 +10,8 @@ https://arxiv.org/abs/1710.09412
 __author__ = 'Yuan Xu, Erdene-Ochir Tuguldur'
 
 __all__ = [ 'mixup_cross_entropy_loss', 'mixup', 'mixup_multi_targets', 'cutmix_multi_targets', 'onehot',
-            'COUNT_GRAPHEME', 'COUNT_VOWEL', 'COUNT_CONSONANT', 'mixup_binary_cross_entropy_loss']
+            'COUNT_GRAPHEME', 'COUNT_VOWEL', 'COUNT_CONSONANT', 'mixup_binary_cross_entropy_loss',
+            'mk_gridmask', 'gridmix_multi_targets']
 
 import numpy as np
 import torch
@@ -112,6 +113,71 @@ def cutmix_multi_targets(data, targets1, targets2, targets3, targets4, alpha):
     ## original code
     #targets = [targets1, shuffled_targets1, targets2, shuffled_targets2, targets3, shuffled_targets3, lam]
     #return data, targets
+
+from PIL import Image
+def mk_gridmask(h, w, d1, d2, ratio, rotate=90):
+    """ratio: keep ratio (length)"""
+    hh = int(1.5*h)
+    ww = int(1.5*w)
+    d = np.random.randint(d1, d2)
+    l = int(d*ratio+0.5)
+    mask = np.ones((hh, ww), np.float32)
+    st_h = np.random.randint(d)
+    st_w = np.random.randint(d)
+    for i in range(-1, hh//d+1):
+            s = d*i + st_h
+            t = s+l
+            s = max(min(s, hh), 0)
+            t = max(min(t, hh), 0)
+            mask[s:t,:] = 0.
+    for i in range(-1, ww//d+1):
+            s = d*i + st_w
+            t = s+l
+            s = max(min(s, ww), 0)
+            t = max(min(t, ww), 0)
+            mask[:,s:t] = 0.
+    r = np.random.randint(rotate)
+    mask = Image.fromarray(np.uint8(mask))
+    mask = mask.rotate(r)
+    mask = np.asarray(mask)
+    mask = mask[(hh-h)//2:(hh-h)//2+h, (ww-w)//2:(ww-w)//2+w]
+
+    return mask
+    ### return mask, 1-(1-ratio)*(1-ratio)
+    ### return torch.from_numpy(mask).float().cuda()
+
+def gridmix_multi_targets(data, targets1, targets2, targets3, targets4, alpha):
+    device = data.device
+    batch, c, h, w = data.size(0), data.size(1), data.size(2), data.size(3)
+
+    targets1, targets2, targets3 = onehot(targets1, 168), onehot(targets2, 11), onehot(targets3, 7)
+
+    indices = torch.randperm(data.size(0))
+    shuffled_data = data[indices]
+    shuffled_targets1 = targets1[indices]
+    shuffled_targets2 = targets2[indices]
+    shuffled_targets3 = targets3[indices]
+    shuffled_targets4 = targets4[indices]
+
+    ### lam = np.random.beta(alpha, alpha)
+    ### bbx1, bby1, bbx2, bby2 = rand_bbox(data.size(), lam)
+
+    raw_ratios = np.random.uniform(0.3, 0.4, batch)
+    lam = 1 - (1 - raw_ratios) ** 2  # 0.36 ~ 0.5
+    masks = torch.Tensor(np.array([mk_gridmask(
+        C.image_size[0], C.image_size[1], C.image_size[0]*0.4, C.image_size[0]*0.5, _ratio) for _ratio in lam])
+    ).to(device).view(batch, c, h, w)
+
+    data[masks == 0] = data[indices][masks == 0]
+    ### adjust lambda to exactly match pixel ratio
+    ### lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (data.size()[-1] * data.size()[-2]))
+
+    lam = torch.Tensor(lam).view(batch, 1).to(device)
+    t1 = lam*targets1 + (1-lam)*shuffled_targets1
+    t2 = lam*targets2 + (1-lam)*shuffled_targets2
+    t3 = lam*targets3 + (1-lam)*shuffled_targets3
+    t4 = lam*targets4 + (1-lam)*shuffled_targets4
+    return data, t1, t2, t3,  t4
 
 ALPHA = 0.4  # fastai kernel
 def mixup_multi_targets(inputs, targets1, targets2, targets3, targets4, alpha):
