@@ -170,7 +170,8 @@ class BengaliModule(pl.LightningModule):
 
         _p = np.random.rand()
         if _p < C.aug_cutmix_p:
-            x, y0, y1, y2, y3 = cutmix_multi_targets(x, y0, y1, y2, y3, alpha=C.aug_cutmix_alpha)  # alpha 1 is recoomended
+            # x, y0, y1, y2, y3 = cutmix_multi_targets(x, y0, y1, y2, y3, alpha=C.aug_cutmix_alpha)  # alpha 1 is recoomended
+            x, y0, y1, y2, y3 = cut4mix_multi_targets(x, y0, y1, y2, y3)  # alpha 1 is recoomended
         elif _p < C.aug_cutmix_p + C.aug_mixup_p:
             x, y0, y1, y2, y3 = mixup_multi_targets(x, y0, y1, y2, y3, alpha=C.aug_mixup_alpha)
         else:

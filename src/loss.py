@@ -11,7 +11,7 @@ __author__ = 'Yuan Xu, Erdene-Ochir Tuguldur'
 
 __all__ = [ 'mixup_cross_entropy_loss', 'mixup', 'mixup_multi_targets', 'cutmix_multi_targets', 'onehot',
             'COUNT_GRAPHEME', 'COUNT_VOWEL', 'COUNT_CONSONANT', 'mixup_binary_cross_entropy_loss',
-            'mk_gridmask', 'gridmix_multi_targets']
+            'mk_gridmask', 'gridmix_multi_targets', 'cut4mix_multi_targets']
 
 import numpy as np
 import torch
@@ -125,6 +125,102 @@ def cutmix_multi_targets(data, targets1, targets2, targets3, targets4, alpha):
     ## original code
     #targets = [targets1, shuffled_targets1, targets2, shuffled_targets2, targets3, shuffled_targets3, lam]
     #return data, targets
+
+def _bbox(img):
+    rows = np.any(img, axis=1)
+    cols = np.any(img, axis=0)
+    hmin, hmax = np.where(rows)[0][[0, -1]]
+    wmin, wmax = np.where(cols)[0][[0, -1]]
+    return hmin, hmax, wmin, wmax
+
+def pick_center(img):  # img: [1,H,W]
+    img = img.cpu().numpy()
+    if False:
+        plt.subplot(1,2,1)
+        plt.imshow(x[0][0].cpu().numpy())
+
+    # threth = np.percentile(img, 80)
+    threth = img.min() + 0.4 * (img.max() - img.min())
+
+    img_bin = img >= threth
+    hmin, hmax, wmin, wmax = _bbox(img_bin)
+    hcenter = (hmin + hmax) // 2
+    wcenter = (wmin + wmax) // 2
+
+    img_bin = img_bin.astype(float)
+    img_bin[hcenter-5:hcenter+5, wcenter-5:wcenter+5] = 0.2
+    if False:
+        plt.subplot(1,2,2)
+        plt.imshow(img_bin)
+        plt.show()
+    return hcenter, wcenter
+    
+
+def shift_img(_i, dh, dw):
+    _i = np.roll(_i, dh, axis=0)
+    _i = np.roll(_i, dw, axis=1)
+    if dh >= 0:
+        _i[: dh] = 0.
+    else:
+        _i[ dh: ] = 0.
+    if dw >= 0:
+        _i[:, : dw] = 0.
+    else:
+        _i[:, dw: ] = 0.
+    return _i
+
+def cut4mix_multi_targets(data, targets1, targets2, targets3, targets4):
+    batch, c, h, w = data.size()
+    targets1, targets2, targets3 = onehot(targets1, 168), onehot(targets2, 11), onehot(targets3, 7)
+
+    indices = torch.randperm(data.size(0))
+    shuffled_data = data[indices]
+    
+    out = np.zeros((batch,h,w))
+    lam = np.zeros(batch)
+    for b in range(batch):
+        JIT = h // 8
+        ch = np.random.randint(h//2-JIT, h//2+JIT) 
+        cw = np.random.randint(w//2-JIT, w//2+JIT)
+        
+        hh, ww = pick_center(data[b, 0]) + np.random.randint(-2, 3, size=(2))
+        _i  = shift_img(data[b,0].cpu().numpy(), ch - hh, cw - ww)
+
+        hh, ww = pick_center(data[indices][b,0]) + np.random.randint(-2, 3, size=(2))
+        _i2 = shift_img(data[indices][b,0].cpu().numpy(), ch - hh, cw - ww)
+
+        cnt = 0
+        out[b] = _i
+        if np.random.rand() > 0.5:
+            out[b][:ch, :cw] = _i2[:ch, :cw]
+            cnt += 1
+        if np.random.rand() > 0.5:
+            out[b][:ch, cw:] = _i2[:ch, cw:]
+            cnt += 1
+        if np.random.rand() > 0.5:
+            out[b][ch:, :cw] = _i2[ch:, :cw]
+            cnt += 1
+        if np.random.rand() > 0.5:
+            out[b][ch:, cw:] = _i2[ch:, cw:]
+            cnt += 1
+        lam[b] = 1 - cnt/4.
+
+    # lam = np.random.beta(alpha, alpha)
+    # bbx1, bby1, bbx2, bby2 = rand_bbox(data.size(), lam)
+    lam = torch.tensor(lam).view(batch, 1).to(C.device)
+    # data[:, :, bbx1:bbx2, bby1:bby2] = data[indices, :, bbx1:bbx2, bby1:bby2]
+    # adjust lambda to exactly match pixel ratio
+    # lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (data.size()[-1] * data.size()[-2]))
+
+    shuffled_targets1 = targets1[indices]
+    shuffled_targets2 = targets2[indices]
+    shuffled_targets3 = targets3[indices]
+    shuffled_targets4 = targets4[indices]
+    t1 = lam*targets1 + (1-lam)*shuffled_targets1
+    t2 = lam*targets2 + (1-lam)*shuffled_targets2
+    t3 = lam*targets3 + (1-lam)*shuffled_targets3
+    t4 = lam*targets4 + (1-lam)*shuffled_targets4
+    return torch.tensor(out, dtype=torch.float).view(batch, 1, h, w).to(C.device), t1, t2, t3,  t4
 
 from PIL import Image
 def mk_gridmask(h, w, d1, d2, ratio, rotate=90):
