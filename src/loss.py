@@ -27,10 +27,22 @@ COUNT_CONSONANT = [125278, 7424, 23465, 619, 21270, 21397, 1387]
 def inverse_sqrt_and_norm(arr):
     inv = 1. / np.sqrt(np.array(arr))
     return inv / np.median(inv)  # scale by median. scale so that median weight is 1 
-WEIGHT_GRAPHEME  = torch.Tensor(inverse_sqrt_and_norm(COUNT_GRAPHEME).reshape(1, 168)).to(C.device)
-WEIGHT_VOWEL     = torch.Tensor(inverse_sqrt_and_norm(COUNT_VOWEL).reshape(1, 11)).to(C.device)
-WEIGHT_CONSONANT = torch.Tensor(inverse_sqrt_and_norm(COUNT_CONSONANT).reshape(1, 7)).to(C.device)
-CLASS_WEIGHTS = [WEIGHT_GRAPHEME, WEIGHT_VOWEL, WEIGHT_CONSONANT]
+def eff_weight(arr, beta):
+    inv = np.array([(1. - beta) / (1. - beta**n) for n in arr])
+    ret = inv / np.median(inv)
+    print("weight", ret)
+    return ret
+
+if False:
+    WEIGHT_GRAPHEME  = torch.Tensor(inverse_sqrt_and_norm(COUNT_GRAPHEME).reshape(1, 168)).to(C.device)
+    WEIGHT_VOWEL     = torch.Tensor(inverse_sqrt_and_norm(COUNT_VOWEL).reshape(1, 11)).to(C.device)
+    WEIGHT_CONSONANT = torch.Tensor(inverse_sqrt_and_norm(COUNT_CONSONANT).reshape(1, 7)).to(C.device)
+    CLASS_WEIGHTS = [WEIGHT_GRAPHEME, WEIGHT_VOWEL, WEIGHT_CONSONANT]
+else:
+    WEIGHT_GRAPHEME  = torch.Tensor(eff_weight(COUNT_GRAPHEME, 1-1./2000).reshape(1, 168)).to(C.device)
+    WEIGHT_VOWEL     = torch.Tensor(np.ones_like(COUNT_VOWEL).reshape(1, 11)).to(C.device)
+    WEIGHT_CONSONANT = torch.Tensor(np.ones_like(COUNT_CONSONANT).reshape(1, 7)).to(C.device)
+    CLASS_WEIGHTS = [WEIGHT_GRAPHEME, WEIGHT_VOWEL, WEIGHT_CONSONANT]
 
 def mixup_cross_entropy_loss(input, target, class_dx, size_average=True):
     """Origin: https://github.com/moskomule/mixup.pytorch
