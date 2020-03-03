@@ -1,0 +1,30 @@
+n_epoch: 120
+fold: 0
+
+use_pretrain: true
+scheduler: 'Cosine'
+lr: 0.00002
+batch_size: 128
+
+fold: 0
+use_class_weight: False
+
+# AUG
+aug_cutmix_p:  0.5
+aug_cutmix_alpha: 1.
+aug_mixup_p: 0.5
+aug_mixup_alpha: 0.8
+
+aug_gridmask_p: 0.5
+
+# PREPROCESS
+crop: false
+crop_pad_size: 0  # valid when crop is true
+image_size: [128, 128]
+
+# AUG
+aug_scale: [-0.05, 0.05]  # moderate scal factor
+aug_rot: 10
+aug_shear: 5
+aug_morph: 0.3
+aug_auto_contrast_p: 0.5
