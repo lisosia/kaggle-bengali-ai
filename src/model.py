@@ -18,6 +18,8 @@ from loss import *
 import config
 C = config.get_config()
 
+from models.resnet import resnet34
+
 def residual_add(lhs, rhs):
     lhs_ch, rhs_ch = lhs.shape[1], rhs.shape[1]
     if lhs_ch < rhs_ch:
@@ -197,10 +199,13 @@ class PretrainedCNN(nn.Module):
                 in_channels, 3, kernel_size=3, stride=1, padding=1, bias=True)
         else:
             self.mesh = _make_mesh(C.batch_size, C.image_size[0], C.image_size[1]).to(C.device)
-
-        self.base_model = pretrainedmodels.__dict__[model_name](pretrained=pretrained)
+        if model_name=='resnet34':
+            self.base_model = resnet34(pretrained=C.use_pretrain)
+            inch = 512
+        else:
+            self.base_model = pretrainedmodels.__dict__[model_name](pretrained=pretrained)
+            inch = self.base_model.last_linear.in_features
         activation = F.leaky_relu
-        inch = self.base_model.last_linear.in_features
 
         hdim = 512
         lin1 = LinearBlock(inch, hdim, use_bn=use_bn, activation=activation, residual=False)
