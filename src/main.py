@@ -22,6 +22,7 @@ import torch
 from torch.utils.data.dataloader import DataLoader
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.logging import TensorBoardLogger
 
 
 # --- import local modules ---
@@ -367,13 +368,19 @@ def train(args):
     m = BengaliModule(args)
     checkpoint_callback = ModelCheckpoint(
     filepath=f'lightning_logs/{os.path.basename(args.config)}',
-    save_top_k=3,
+    save_top_k=1,
     verbose=True,
     monitor='recall/weight_mean',
     mode='max',
     prefix=''
     )
+    logger = logger = TensorBoardLogger(
+    save_dir='lightning_logs/',
+    name=os.path.basename(args.config),
+    )
     trainer = pl.Trainer(
+        # default_save_path=f'lightning_logs/{os.path.basename(args.config)}',
+        logger=logger,
         early_stop_callback=None, max_epochs=C.n_epoch,
         checkpoint_callback=checkpoint_callback,
         fast_dev_run=False)

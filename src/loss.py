@@ -30,7 +30,7 @@ def inverse_sqrt_and_norm(arr):
 def eff_weight(arr, beta):
     inv = np.array([(1. - beta) / (1. - beta**n) for n in arr])
     ret = inv / np.median(inv)
-    print("weight", ret)
+    # print("weight", ret)
     return ret
 
 if False:
