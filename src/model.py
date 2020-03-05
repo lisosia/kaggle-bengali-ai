@@ -21,6 +21,7 @@ C = config.get_config()
 # from models.resnet import resnet34
 # from models.resnet_maxpool import resnet34
 from models.resnet_maxblur import resnet34
+# from models.resnet_sse import resnet34
 
 def residual_add(lhs, rhs):
     lhs_ch, rhs_ch = lhs.shape[1], rhs.shape[1]

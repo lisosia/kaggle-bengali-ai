@@ -9,6 +9,7 @@ import torch
 from torch.utils.data.dataset import Dataset
 
 import config
+from augmentation import *
 
 C = config.get_config()
 
@@ -343,8 +344,45 @@ def _evaluate_ratio(ratio):
 def apply_aug(aug, image):
     return aug(image=image)['image']
 
-
 class Transform:
+    def __init__(self, aug, train=True, affine=True, size=None):
+        self.aug = aug
+        self.train = train
+    def __call__(self, example):
+        if self.train:
+            x, y = example
+        else:
+            x = example
+        ####################################
+        #original = x.copy()
+        #original = to_112x112(original)
+        if self.aug:
+            for op in np.random.choice([
+                lambda image: do_identity(image, 0),
+                lambda image: do_random_scale(image, 0.3),
+                lambda image: do_random_rotate(image, 0.4),
+                lambda image: do_random_shear_x(image, 0.5),
+                lambda image: do_random_shear_y(image, 0.25),
+                lambda image: do_random_stretch_x(image, 0.3),
+                lambda image: do_random_stretch_y(image, 0.3),
+            ], 1):
+                x = op(x)
+                x = to_112x112(x)
+        else:
+            x = to_112x112(x)
+
+        ####################################
+        if x.ndim == 2:
+            x = x[None, :, :]
+        x = x.astype(np.float32)
+        if self.train:
+            y = y.astype(np.int64)
+            return x, y
+        else:
+            return x
+        
+
+class Transform___:
     def __init__(self, aug, affine=True, size=(64, 64),
                  normalize=False, train=True, threshold=40.,
                  sigma=-1., blur_ratio=0., noise_ratio=0., cutout_ratio=0.,
