@@ -366,6 +366,20 @@ class BengaliModule(pl.LightningModule):
 
 def train(args):
     m = BengaliModule(args)
+    if False:
+        checkpoint_path = "lightning_logs/105.bak/_ckpt_epoch_128.ckpt"
+        checkpoint = torch.load(checkpoint_path)['state_dict']
+        for k in checkpoint.copy().keys():
+            if k.startswith('classifier.predictor.base_model.conv1') or \
+                    k.startswith('classifier.predictor.base_model.bn1'):
+                print("   delete", k)
+                checkpoint.pop(k)
+        miss, unexp = m.load_state_dict(checkpoint, strict=False)
+        print("missing", miss)
+        print("unexpected", unexp)
+        # TODO freeze layeres
+        ### exit()
+
     checkpoint_callback = ModelCheckpoint(
     filepath=f'lightning_logs/{os.path.basename(args.config)}',
     save_top_k=1,

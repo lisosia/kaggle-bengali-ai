@@ -19,7 +19,7 @@ aug_cutmix_alpha: 1.
 aug_mixup_p: 0.0
 aug_mixup_alpha: 0.8
 
-aug_gridmask_p: 0.5
+aug_gridmask_p: 0.0
 
 # PREPROCESS
 crop: false

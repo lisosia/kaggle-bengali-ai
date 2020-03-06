@@ -10,16 +10,17 @@ scheduler: 'ReduceLR'
 lr: 0.00002
 batch_size: 128
 
-fold: 0
 use_class_weight: False
 
 # AUG
+aug_gridmask_p: 0.5
+
+
+
 aug_cutmix_p:  0.0
 aug_cutmix_alpha: 1.
 aug_mixup_p: 0.0
 aug_mixup_alpha: 0.8
-
-aug_gridmask_p: 0.5
 
 # PREPROCESS
 crop: false
