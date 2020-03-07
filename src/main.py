@@ -305,7 +305,7 @@ class BengaliModule(pl.LightningModule):
         arr0, arr1, arr2 = [], [], []
         for x in loader:
             with torch.no_grad():
-                preds0, preds1, preds2 = self.forward(x.to(self.device))
+                preds0, preds1, preds2, _ = self.forward(x.to(self.device))
             arr0.append(np.apply_along_axis(softmax, -1, preds0.cpu().numpy()))
             arr1.append(np.apply_along_axis(softmax, -1, preds1.cpu().numpy()))
             arr2.append(np.apply_along_axis(softmax, -1, preds2.cpu().numpy()))
