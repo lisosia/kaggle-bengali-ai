@@ -204,7 +204,13 @@ class PretrainedCNN(nn.Module):
             #    in_channels, 3, kernel_size=3, stride=1, padding=1, bias=True)
         else:
             self.mesh = _make_mesh(C.batch_size, C.image_size[0], C.image_size[1]).to(C.device)
+
         if model_name=='resnet34':
+            self.base_model = resnet34(pretrained=C.use_pretrain)
+            inch = 512
+        elif model_name=='resnet34_dropblock':
+            print("dropblock version of resnet34")
+            from models.resnet_dropblock import resnet34
             self.base_model = resnet34(pretrained=C.use_pretrain)
             inch = 512
         elif model_name=='seresnext50_dropblock':
