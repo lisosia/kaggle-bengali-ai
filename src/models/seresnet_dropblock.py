@@ -9,6 +9,10 @@ import math
 import torch.nn as nn
 from torch.utils import model_zoo
 
+from models.util import Downsample, DropBlock2D
+print("loaded model: ", __file__)
+
+
 __all__ = ['SENet', 'senet154', 'se_resnet50', 'se_resnet101', 'se_resnet152',
            'se_resnext50_32x4d', 'se_resnext101_32x4d']
 
@@ -276,6 +280,8 @@ class SENet(nn.Module):
                 ('bn1', nn.BatchNorm2d(inplanes)),
                 ('relu1', nn.ReLU(inplace=True)),
             ]
+
+        ##########################################################################
         # To preserve compatibility with Caffe weights `ceil_mode=True`
         # is used instead of `padding=1`.
         ### layer0_modules.append(('pool', nn.MaxPool2d(3, stride=2,
@@ -284,6 +290,7 @@ class SENet(nn.Module):
         self.layer0 = nn.Sequential(OrderedDict(layer0_modules))
         self.maxblur0 = nn.Sequential(*[nn.MaxPool2d(kernel_size=2, stride=1), 
             Downsample(stride=2, channels=64)])
+        ##########################################################################
 
 
         self.layer1 = self._make_layer(
@@ -295,11 +302,12 @@ class SENet(nn.Module):
             downsample_kernel_size=1,
             downsample_padding=0
         )
+        print("===DEBUG", self.inplanes)
         self.layer2 = self._make_layer(
             block,
             planes=128,
             blocks=layers[1],
-            stride=2,
+            stride=1,  # 2->1
             groups=groups,
             reduction=reduction,
             downsample_kernel_size=downsample_kernel_size,
@@ -309,7 +317,7 @@ class SENet(nn.Module):
             block,
             planes=256,
             blocks=layers[2],
-            stride=2,
+            stride=1,  # 2->1
             groups=groups,
             reduction=reduction,
             downsample_kernel_size=downsample_kernel_size,
@@ -319,7 +327,7 @@ class SENet(nn.Module):
             block,
             planes=512,
             blocks=layers[3],
-            stride=2,
+            stride=1,  # 2->1
             groups=groups,
             reduction=reduction,
             downsample_kernel_size=downsample_kernel_size,
@@ -327,11 +335,11 @@ class SENet(nn.Module):
         )
 
         self.maxblur1 = nn.Sequential(*[nn.MaxPool2d(kernel_size=2, stride=1), 
-            Downsample(stride=2, channels=64)])
-        self.maxblur2 = nn.Sequential(*[nn.MaxPool2d(kernel_size=2, stride=1), 
-            Downsample(stride=2, channels=128)])
-        self.maxblur3 = nn.Sequential(*[nn.MaxPool2d(kernel_size=2, stride=1), 
             Downsample(stride=2, channels=256)])
+        self.maxblur2 = nn.Sequential(*[nn.MaxPool2d(kernel_size=2, stride=1), 
+            Downsample(stride=2, channels=512)])
+        self.maxblur3 = nn.Sequential(*[nn.MaxPool2d(kernel_size=2, stride=1), 
+            Downsample(stride=2, channels=1024)])
 
         # dropblock
         self.dropblock0 = DropBlock2D(drop_prob=0.2, block_size=24)
@@ -401,7 +409,12 @@ def initialize_pretrained_model(model, num_classes, settings):
     assert num_classes == settings['num_classes'], \
         'num_classes should be {}, but is {}'.format(
             settings['num_classes'], num_classes)
-    model.load_state_dict(model_zoo.load_url(settings['url']))
+    # model.load_state_dict(model_zoo.load_url(settings['url']))
+    miss, unexp = model.load_state_dict(model_zoo.load_url(settings['url']), strict=False)
+    print("pretrained loaded")
+    print("  missing key", miss)
+    print("  unexpected key", unexp)
+
     model.input_space = settings['input_space']
     model.input_size = settings['input_size']
     model.input_range = settings['input_range']
