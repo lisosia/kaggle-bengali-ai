@@ -21,7 +21,7 @@ C = config.get_config()
 # from models.resnet import resnet34
 # from models.resnet_maxpool import resnet34
 # from models.resnet_maxblur import resnet34
-from models.resnet_dropblock import resnet34
+# from models.resnet_dropblock import resnet34
 # from models.resnet_dropblock_surgery import resnet34
 
 def residual_add(lhs, rhs):
@@ -199,13 +199,19 @@ class PretrainedCNN(nn.Module):
                  pretrained='imagenet'):
         super(PretrainedCNN, self).__init__()
         if True:
-            self.conv0 = nn.Conv2d(
-                in_channels, 3, kernel_size=3, stride=1, padding=1, bias=True)
+            pass
+            #self.conv0 = nn.Conv2d(
+            #    in_channels, 3, kernel_size=3, stride=1, padding=1, bias=True)
         else:
             self.mesh = _make_mesh(C.batch_size, C.image_size[0], C.image_size[1]).to(C.device)
         if model_name=='resnet34':
             self.base_model = resnet34(pretrained=C.use_pretrain)
             inch = 512
+        elif model_name=='seresnext50_dropblock':
+            print("dropblock version of seresnext50")
+            from models.seresnet_dropblock import se_resnext50_32x4d
+            self.base_model = se_resnext50_32x4d(pretrained='imagenet' if C.use_pretrain else None)
+            inch = 2048
         else:
             self.base_model = pretrainedmodels.__dict__[model_name](pretrained=pretrained)
             inch = self.base_model.last_linear.in_features
