@@ -212,6 +212,11 @@ class PretrainedCNN(nn.Module):
             from models.seresnet_dropblock import se_resnext50_32x4d
             self.base_model = se_resnext50_32x4d(pretrained='imagenet' if C.use_pretrain else None)
             inch = 2048
+        elif model_name=='seresnext50_dropblock_surgery':
+            print("surgeryed, dropblock version of seresnext50")
+            from models.seresnet_dropblock_surgery import se_resnext50_32x4d
+            self.base_model = se_resnext50_32x4d(pretrained='imagenet' if C.use_pretrain else None)
+            inch = 2048
         else:
             self.base_model = pretrainedmodels.__dict__[model_name](pretrained=pretrained)
             inch = self.base_model.last_linear.in_features
