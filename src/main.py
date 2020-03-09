@@ -367,17 +367,22 @@ class BengaliModule(pl.LightningModule):
 def train(args):
     m = BengaliModule(args)
     if True:
-        checkpoint_path = "lightning_logs/205_seres_dropblock.yml/_ckpt_epoch_198.ckpt"
-        # checkpoint_path = "lightning_logs/106_dropblock_surgery.yml/epoch5.bak"
-
+        FREEZE = False
+        if FREEZE:
+            checkpoint_path = "lightning_logs/205_seres_dropblock.yml/_ckpt_epoch_198.ckpt"
+        else:
+            checkpoint_path = "lightning_logs/206_seres_dropblock_surgery.yml/freeze_train/_ckpt_epoch_4.ckpt"
         checkpoint = torch.load(checkpoint_path)['state_dict']
-        for k in checkpoint.copy().keys():
-            print(k)
-            #if k.startswith('classifier.predictor.base_model.conv1') or \
-            #        k.startswith('classifier.predictor.base_model.bn1'):
-            if k.startswith('classifier.predictor.base_model.layer0'):
-                print("   delete dict key", k)
-                checkpoint.pop(k)
+
+        if FREEZE:
+            for k in checkpoint.copy().keys():
+                print(k)
+                #if k.startswith('classifier.predictor.base_model.conv1') or \
+                #        k.startswith('classifier.predictor.base_model.bn1'):
+                if k.startswith('classifier.predictor.base_model.layer0'):
+                    print("   delete dict key", k)
+                    checkpoint.pop(k)
+
         miss, unexp = m.load_state_dict(checkpoint, strict=False)
         print("missing", miss)
         print("unexpected", unexp)
@@ -386,8 +391,7 @@ def train(args):
             if name.startswith('classifier.predictor.base_model.layer0'):
                 param.requires_grad = True
             else:
-                param.requires_grad = False
-                ### param.requires_grad = True
+                param.requires_grad = not FREEZE
             print(name, param.size(), param.requires_grad)
         # exit()
 

@@ -1,5 +1,5 @@
 # n_epoch: 80
-n_epoch: 200
+n_epoch: 300
 fold: 0
 
 # model_name: 'resnet34'
