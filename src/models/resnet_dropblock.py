@@ -150,7 +150,11 @@ class ResNet(nn.Module):
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+
+        ### self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.maxblur0 = nn.Sequential(*[nn.MaxPool2d(kernel_size=2, stride=1),
+            Downsample(stride=2, channels=64)])
+
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=1,  #2->1
                                        dilate=replace_stride_with_dilation[0])
@@ -221,14 +225,11 @@ class ResNet(nn.Module):
         x = self.bn1(x)
         x = self.relu(x)
 
-        x = self.dropblock0(x)  # added
         x = self.maxpool(x)
 
         x = self.layer1(x)
-        x = self.dropblock1(x)  # added
         x = F.max_pool2d(x, kernel_size=2, stride=2)  # added
         x = self.layer2(x)
-        x = self.dropblock2(x)  # added
         x = F.max_pool2d(x, kernel_size=2, stride=2)  # added
         x = self.layer3(x)
         x = F.max_pool2d(x, kernel_size=2, stride=2)  # added
@@ -247,12 +248,18 @@ class ResNet(nn.Module):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
-        x = self.maxpool(x)
+
+        x = self.dropblock0(x)  # added
+        x = self.maxblur0(x)
 
         x = self.layer1(x)
+        x = self.dropblock1(x)  # added
         x = self.maxblur1(x)  # added
+
         x = self.layer2(x)
+        x = self.dropblock2(x)  # added
         x = self.maxblur2(x)  # added
+
         x = self.layer3(x)
         x = self.maxblur3(x)  # added
         x = self.layer4(x)
