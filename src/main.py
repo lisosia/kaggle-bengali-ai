@@ -21,7 +21,8 @@ from sklearn.model_selection import KFold
 import torch
 from torch.utils.data.dataloader import DataLoader
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint
+# from pytorch_lightning.callbacks import ModelCheckpoint
+from util  import ModelCheckpointCustom
 from pytorch_lightning.logging import TensorBoardLogger
 
 
@@ -49,7 +50,7 @@ if True:
 
 from dataset import *
 from model import *
-from myoptim import OneCycleLR
+from myoptim import OneCycleLR, CosineAnnealingWarmUpRestarts
 from trans import *
 from util import *
 
@@ -137,9 +138,15 @@ class BengaliModule(pl.LightningModule):
     def _calc_loss_metric(preds, y0, y1, y2, y3, log_prefix):
         """return loss(torch.Tensor) and log(not Tensor)"""
         # _loss_func = mixup_cross_entropy_loss if do_mixup else torch.nn.functional.cross_entropy
-        loss_grapheme = mixup_cross_entropy_loss(preds[0], y0, class_dx=0)
-        loss_vowel = mixup_cross_entropy_loss(preds[1], y1, class_dx=1)
-        loss_consonant = mixup_cross_entropy_loss(preds[2], y2, class_dx=2)
+        if 0:
+            loss_grapheme = mixup_cross_entropy_loss(preds[0], y0, class_dx=0)
+            loss_vowel = mixup_cross_entropy_loss(preds[1], y1, class_dx=1)
+            loss_consonant = mixup_cross_entropy_loss(preds[2], y2, class_dx=2)
+        else:
+            loss_grapheme  = ohem_loss(preds[0], y0)
+            loss_vowel     = ohem_loss(preds[1], y1)
+            loss_consonant = ohem_loss(preds[2], y2)
+
         loss_comp = mixup_binary_cross_entropy_loss(preds[3], y3)
         loss = 3*0.5* loss_grapheme + 3*0.25* loss_vowel + 3*0.25* loss_consonant + 3*0.006*loss_comp
 
@@ -169,25 +176,27 @@ class BengaliModule(pl.LightningModule):
 
         y0, y1, y2, y3 = y[:, 0], y[:, 1], y[:, 2], y[:, 3:]
 
-        _p = np.random.rand()
-        if _p < C.aug_cutmix_p:
-            # x, y0, y1, y2, y3 = cutmix_multi_targets(x, y0, y1, y2, y3, alpha=C.aug_cutmix_alpha)  # alpha 1 is recoomended
-            x, y0, y1, y2, y3 = cut4mix_multi_targets(x, y0, y1, y2, y3)  # alpha 1 is recoomended
-        elif _p < C.aug_cutmix_p + C.aug_mixup_p:
-            x, y0, y1, y2, y3 = mixup_multi_targets(x, y0, y1, y2, y3, alpha=C.aug_mixup_alpha)
-        else:
-            y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
+        y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
 
-        ### GridMask ###
-        # y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
-        _gridmask_p = np.random.rand()
-        cur_epo = self.trainer.current_epoch
-        GM_MAX_PROB = C.aug_gridmask_p #0.8 is from paper
-        GM_SATURATE_EPO = 0.1  # 0.8 by paper
-        self.GM_PROB = GM_MAX_PROB * min(1, cur_epo / (C.n_epoch * GM_SATURATE_EPO))
-        if _gridmask_p < self.GM_PROB:
-            x = self.trans_gridmask(x).to(C.device)
-        ### GridMask ###
+        ###   _p = np.random.rand()
+        ###   if _p < C.aug_cutmix_p:
+        ###       # x, y0, y1, y2, y3 = cutmix_multi_targets(x, y0, y1, y2, y3, alpha=C.aug_cutmix_alpha)  # alpha 1 is recoomended
+        ###       x, y0, y1, y2, y3 = cut4mix_multi_targets(x, y0, y1, y2, y3)  # alpha 1 is recoomended
+        ###   elif _p < C.aug_cutmix_p + C.aug_mixup_p:
+        ###       x, y0, y1, y2, y3 = mixup_multi_targets(x, y0, y1, y2, y3, alpha=C.aug_mixup_alpha)
+        ###   else:
+        ###       y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
+
+        ###   ### GridMask ###
+        ###   # y0, y1, y2 = onehot(y0, 168), onehot(y1, 11), onehot(y2, 7)
+        ###   _gridmask_p = np.random.rand()
+        ###   cur_epo = self.trainer.current_epoch
+        ###   GM_MAX_PROB = C.aug_gridmask_p #0.8 is from paper
+        ###   GM_SATURATE_EPO = 0.1  # 0.8 by paper
+        ###   self.GM_PROB = GM_MAX_PROB * min(1, cur_epo / (C.n_epoch * GM_SATURATE_EPO))
+        ###   if _gridmask_p < self.GM_PROB:
+        ###       x = self.trans_gridmask(x).to(C.device)
+        ###   ### GridMask ###
 
         preds = self.forward(x)
         loss, logs, _ = self._calc_loss_metric(preds, y0, y1, y2, y3, log_prefix='train')
@@ -268,7 +277,7 @@ class BengaliModule(pl.LightningModule):
             optimizer =  torch.optim.Adam(self.classifier.parameters(), lr=C.lr * C.batch_size,
                     weight_decay=C.weight_decay)
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer, mode='min', factor=0.7, patience=5, min_lr=C.lr*C.batch_size/16., verbose=True)
+                optimizer, mode='min', factor=0.7, patience=5, min_lr=C.lr*C.batch_size/64., verbose=True)
         elif C.scheduler == 'Cosine':
             # https://www.kaggle.com/c/bengaliai-cv19/discussion/123198#719043
             init_lr = C.lr * C.batch_size
@@ -281,6 +290,14 @@ class BengaliModule(pl.LightningModule):
             optimizer =  torch.optim.SGD(self.classifier.parameters(), lr=init_lr, nesterov=True, momentum=0.9)
             scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
                 optimizer, C.n_epoch, eta_min=init_lr / 16.)
+        elif C.scheduler == 'CosineWarm':
+            # https://www.kaggle.com/c/bengaliai-cv19/discussion/123198#719043
+            print("[WARN] config.lr not used")
+            init_lr = 1E-4
+            eta_lr = 1E-6
+            optimizer = torch.optim.Adam(self.classifier.parameters(), lr=eta_lr)
+            scheduler = CosineAnnealingWarmUpRestarts(
+                optimizer, T_0=C.n_epoch+1, eta_max=init_lr, T_up=10, gamma=0.0001)
         else:
             raise "unknown optim"
             
@@ -367,11 +384,14 @@ class BengaliModule(pl.LightningModule):
 def train(args):
     m = BengaliModule(args)
     if True:
+        print("start surgery")
         FREEZE = False
         if FREEZE:
             checkpoint_path = "lightning_logs/205_seres_dropblock.yml/_ckpt_epoch_198.ckpt"
         else:
-            checkpoint_path = "lightning_logs/206_seres_dropblock_surgery.yml/freeze_train/_ckpt_epoch_4.ckpt"
+            # checkpoint_path = "lightning_logs/206_seres_dropblock_surgery.yml/freeze_train/_ckpt_epoch_6.ckpt"
+            # checkpoint_path = "lightning_logs/206.fold3.yml/freeze_train/_ckpt_epoch_5.ckpt"
+            checkpoint_path = "lightning_logs/206.fold3.yml/_ckpt_epoch_84.ckpt"
         checkpoint = torch.load(checkpoint_path)['state_dict']
 
         if FREEZE:
@@ -383,9 +403,10 @@ def train(args):
                     print("   delete dict key", k)
                     checkpoint.pop(k)
 
+        print("load for train")
         miss, unexp = m.load_state_dict(checkpoint, strict=False)
-        print("missing", miss)
-        print("unexpected", unexp)
+        print("  missing", miss)
+        print("  unexpected", unexp)
 
         for name, param in m.named_parameters():
             if name.startswith('classifier.predictor.base_model.layer0'):
@@ -395,9 +416,9 @@ def train(args):
             print(name, param.size(), param.requires_grad)
         # exit()
 
-    checkpoint_callback = ModelCheckpoint(
+    checkpoint_callback = ModelCheckpointCustom(
     filepath=f'lightning_logs/{os.path.basename(args.config)}',
-    save_top_k=1,
+    save_top_k=3,
     verbose=True,
     monitor='recall/weight_mean',
     mode='max',

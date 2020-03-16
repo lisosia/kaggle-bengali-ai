@@ -11,7 +11,7 @@ __author__ = 'Yuan Xu, Erdene-Ochir Tuguldur'
 
 __all__ = [ 'mixup_cross_entropy_loss', 'mixup', 'mixup_multi_targets', 'cutmix_multi_targets', 'onehot',
             'COUNT_GRAPHEME', 'COUNT_VOWEL', 'COUNT_CONSONANT', 'mixup_binary_cross_entropy_loss',
-            'mk_gridmask', 'gridmix_multi_targets', 'cut4mix_multi_targets']
+            'mk_gridmask', 'gridmix_multi_targets', 'cut4mix_multi_targets', 'ohem_loss']
 
 import numpy as np
 import torch
@@ -61,6 +61,24 @@ def mixup_cross_entropy_loss(input, target, class_dx, size_average=True):
         loss = - torch.sum(input * target)
 
     return loss / input.size()[0] if size_average else loss
+
+def ohem_loss(cls_pred, cls_target, rate=0.25):
+    batch_size = cls_pred.size(0)
+    # ohem_cls_loss = F.cross_entropy(cls_pred, cls_target, reduction='none', ignore_index=-1)
+    ohem_cls_loss = - torch.sum(
+        torch.log(torch.nn.functional.softmax(cls_pred, dim=1).clamp(1e-5, 1)) * cls_target,
+        dim=-1)
+    # print("ohem_clk_loos shpe", ohem_cls_loss.shape) # [B]
+
+    sorted_ohem_loss, idx = torch.sort(ohem_cls_loss, descending=True)
+    keep_num = min(sorted_ohem_loss.size()[0], int(batch_size*rate) )
+    # print("kee_num", keep_num) # 38 for b=128,rate=0.3
+
+    if keep_num < sorted_ohem_loss.size()[0]:
+        keep_idx_cuda = idx[:keep_num]
+        ohem_cls_loss = ohem_cls_loss[keep_idx_cuda]
+    cls_loss = ohem_cls_loss.sum() / keep_num
+    return cls_loss
 
 def mixup_binary_cross_entropy_loss(input, target, size_average=True):
     assert input.size() == target.size()
