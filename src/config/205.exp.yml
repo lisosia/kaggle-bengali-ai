@@ -1,22 +1,19 @@
 # n_epoch: 80
-n_epoch: 400
-fold: 1
-num_workers: 4
+n_epoch: 200
+fold: 0
 
 # model_name: 'resnet34'
-model_name: 'seresnext50_dropblock_surgery'
+model_name: 'seresnext50_dropblock'
 aug_gridmask_p: 0.0
 use_pretrain: true
 weight_decay: 0.00001
 
 scheduler: 'ReduceLR'
 lr: 0.00002
-### batch_size: 128
-batch_size: 48
+batch_size: 128
 
+fold: 0
 use_class_weight: False
-
-
 
 # AUG
 

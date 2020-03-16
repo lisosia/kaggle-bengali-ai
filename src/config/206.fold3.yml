@@ -1,6 +1,6 @@
 # n_epoch: 80
-n_epoch: 400
-fold: 1
+n_epoch: 200
+fold: 3
 num_workers: 4
 
 # model_name: 'resnet34'
@@ -10,7 +10,8 @@ use_pretrain: true
 weight_decay: 0.00001
 
 scheduler: 'ReduceLR'
-lr: 0.00002
+# lr: 0.00002
+lr: 0.000005
 ### batch_size: 128
 batch_size: 48
 
